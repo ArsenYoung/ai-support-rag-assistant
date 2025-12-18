@@ -20,6 +20,12 @@ This project is a simple, auditable RAG system:
 - **Answer**: question → retrieval (top-k) → confidence gate → KB-only LLM → answer + sources
 - **Logging**: each chat turn is logged for debugging/metrics (`Ops — Log chat_turn`)
 
+## Why it matters
+- Prevents hallucinations in customer-facing AI
+- Provides auditable answers with clear sources
+- Safe-by-design: unknown questions never produce fabricated answers
+- Ready for regulated or internal company knowledge bases
+
 ## Key features (MVP)
 - KB-only answering (strict prompt)
 - Confidence gating: `ALLOW` / `CLARIFY` / `NO_ANSWER`
@@ -27,43 +33,57 @@ This project is a simple, auditable RAG system:
 - Webhook-based ingest + answer endpoints (easy to smoke-test)
 - Centralized logging with `top_score`, latency, and sources
 
+## Reliability & Safety
+- Retries and backoff for LLM and DB calls (n8n Retry on Fail)
+- Timeouts on all external integrations
+- Graceful fallback on errors with user-safe responses
+- Centralized logging for every chat turn
+
+## Non-goals
+- Not a general chat assistant
+- Not allowed to answer without KB evidence
+- Not optimized for creative or open-ended conversations
+
+## Demo script (60–90 sec)
+1. Show `/sources` — list available KB documents
+2. Ask a KB-backed question → answer with citations
+3. Ask an out-of-scope question → `CLARIFY` / `NO_ANSWER`
+4. Run `/debug` → show `top_score` and sources
+5. Open Supabase → show logged `chat_turns`
+
 ## Architecture (high level)
 ```mermaid
 flowchart LR
-    TG[Telegram User] -->|message| TR[TG Inbound Router]
+    TG[Telegram User] --> TR[TG Inbound Router]
 
     TR --> ENV[Envelope Build]
-
     ENV --> CMD{Command Router}
 
-    CMD -->|/help| HELP[Build Help Reply]
-    CMD -->|/sources| SRC[DB: List Sources]
-    CMD -->|/debug| DBG[Build Debug Reply]
-    CMD -->|question| RAG[KB Answer Pipeline]
+    CMD --> HELP[Help Command]
+    CMD --> SRC[List Sources]
+    CMD --> DBG[Debug Command]
+    CMD --> RAG[KB Answer Pipeline]
 
     %% RAG pipeline
     RAG --> QN[Normalize Question]
     QN --> EMB[Create Embedding]
-    EMB --> RET[Vector Search (kb_chunks)]
+    EMB --> RET[Vector Search]
     RET --> GATE{Confidence Gate}
 
-    GATE -->|ALLOW| LLM[LLM Answer]
-    GATE -->|CLARIFY / NO_ANSWER| FB[Fallback Reply]
+    GATE --> ALLOW[LLM Answer]
+    GATE --> FALLBACK[Fallback Reply]
 
-    LLM --> PARSE[Parse Answer]
+    ALLOW --> PARSE[Parse Answer]
     PARSE --> CITE[Attach Sources]
 
-    %% Merge all replies
     HELP --> OUT
     SRC --> OUT
     DBG --> OUT
     CITE --> OUT
-    FB --> OUT
+    FALLBACK --> OUT
 
-    OUT[Send Telegram Reply]
-
-    %% Logging
-    OUT --> LOG[Log chat_turn (Postgres)]
+    OUT[Send Reply]
+    OUT --> LOG[Log chat turn]
 ```
 
 ## n8n workflows
