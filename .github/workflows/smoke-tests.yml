@@ -40,3 +40,7 @@ jobs:
       - name: Run unit tests (Answer logic)
         run: |
           node tests/unit_answer_logic.test.js
+
+      - name: Run unit tests (TG router envelope)
+        run: |
+          node tests/unit_tg_router_envelope.test.js
