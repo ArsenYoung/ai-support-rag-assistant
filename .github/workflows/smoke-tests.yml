@@ -1,0 +1,26 @@
+name: Run smoke tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Run ingest smoke tests
+        env:
+          N8N_INGEST_URL: ${{ secrets.N8N_INGEST_URL }}
+        run: |
+          bash tests/smoke_ingest.sh
