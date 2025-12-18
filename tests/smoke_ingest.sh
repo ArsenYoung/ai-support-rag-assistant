@@ -22,15 +22,23 @@ post_json() {
   printf "%s\t%s" "$http" "$body"
 }
 
+# Normalize body to a single JSON object:
+# - if body is [ {...} ] -> returns {...}
+# - if body is {...}     -> returns {...}
+norm_obj() {
+  echo "$1" | jq -c 'if type=="array" then .[0] else . end'
+}
+
 # ----- Test 1: VALIDATION_FAIL -> 400 + missing text -----
 t1="$(post_json '{"kb_ref":"demo-support","doc":"x","section":"y","replace":true}')"
 http="$(echo "$t1" | cut -f1)"
 body="$(echo "$t1" | cut -f2-)"
 [[ "$http" == "400" ]] || fail "Test1 expected 400, got $http. Body: $body"
 
-echo "$body" | jq -e '.[0].ok == false
-  and .[0].error.code == "missing_required_fields"
-  and (.[0].error.missing | index("text")) != null' >/dev/null \
+obj="$(norm_obj "$body")"
+echo "$obj" | jq -e '.ok == false
+  and .error.code == "missing_required_fields"
+  and (.error.missing | index("text")) != null' >/dev/null \
   || fail "Test1 unexpected JSON. Body: $body"
 
 pass "Test1 validation -> 400"
@@ -50,12 +58,13 @@ http="$(echo "$t2" | cut -f1)"
 body="$(echo "$t2" | cut -f2-)"
 [[ "$http" == "200" ]] || fail "Test2 expected 200, got $http. Body: $body"
 
-echo "$body" | jq -e '.[0].ok == true
-  and .[0].kb_ref == "demo-support"
-  and (.[0].chunks_upserted|tonumber) >= 1' >/dev/null \
+obj="$(norm_obj "$body")"
+echo "$obj" | jq -e '.ok == true
+  and .kb_ref == "demo-support"
+  and (.chunks_upserted|tonumber) >= 1' >/dev/null \
   || fail "Test2 unexpected JSON. Body: $body"
 
-last_chunk_id="$(echo "$body" | jq -r '.[0].last_chunk_id // empty')"
+last_chunk_id="$(echo "$obj" | jq -r '.last_chunk_id // empty')"
 [[ -n "$last_chunk_id" ]] || fail "Test2 expected last_chunk_id. Body: $body"
 pass "Test2 ingest ok -> 200 (last_chunk_id=$last_chunk_id)"
 
@@ -74,9 +83,10 @@ http="$(echo "$t3" | cut -f1)"
 body="$(echo "$t3" | cut -f2-)"
 [[ "$http" == "200" ]] || fail "Test3 expected 200, got $http. Body: $body"
 
-echo "$body" | jq -e '.[0].ok == true
-  and .[0].kb_ref == "demo-support"
-  and .[0].replace == false' >/dev/null \
+obj="$(norm_obj "$body")"
+echo "$obj" | jq -e '.ok == true
+  and .kb_ref == "demo-support"
+  and .replace == false' >/dev/null \
   || fail "Test3 unexpected JSON. Body: $body"
 
 pass "Test3 upsert update -> 200"
@@ -97,9 +107,10 @@ http="$(echo "$t4" | cut -f1)"
 body="$(echo "$t4" | cut -f2-)"
 [[ "$http" == "200" ]] || fail "Test4 expected 200, got $http. Body: $body"
 
-echo "$body" | jq -e '.[0].ok == true
-  and .[0].doc_id == "access-onboarding-v1"
-  and .[0].replace == true' >/dev/null \
+obj="$(norm_obj "$body")"
+echo "$obj" | jq -e '.ok == true
+  and .doc_id == "access-onboarding-v1"
+  and .replace == true' >/dev/null \
   || fail "Test4 unexpected JSON. Body: $body"
 
 pass "Test4 doc_id branch -> 200"
