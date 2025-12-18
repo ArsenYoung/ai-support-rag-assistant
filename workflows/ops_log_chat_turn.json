@@ -1,0 +1,116 @@
+[
+  {
+    "updatedAt": "2025-12-18T14:39:58.974Z",
+    "createdAt": "2025-12-18T14:21:18.427Z",
+    "id": "Z8yQeXYTQSnRkl3M",
+    "name": "Ops — Log chat_turn",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "f9c0b2a8-7983-4ab4-b8a1-4f54648209df",
+        "name": "When Executed by Another Workflow"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Normalize any incoming payload into a canonical log record\n\nconst input = $json || {};\nconst now = new Date().toISOString();\n\nconst trace_id =\n  input.trace_id ||\n  input.meta?.request_id ||\n  `trace_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;\n\nconst log = {\n  trace_id,\n\n  ts: now,\n\n  channel:\n    input.channel ||\n    input.meta?.channel ||\n    \"unknown\",\n\n  event:\n    input.event ||\n    input.decision?.mode?.toLowerCase() ||\n    \"unknown\",\n\n  user_id:\n    input.input?.user_id ||\n    input.telegram?.message?.from?.id ||\n    null,\n\n  chat_id:\n    input.meta?.chat_id ||\n    input.telegram?.message?.chat?.id ||\n    null,\n\n  model:\n    input.meta?.chat_model ||\n    input.model ||\n    null,\n\n  prompt_version:\n    input.meta?.prompt_version ||\n    null,\n\n  latency_ms:\n    input.latency_ms ||\n    null,\n\n  decision: input.decision || null,\n  error: input.error || null,\n\n  // raw payload snapshot (optional, but great for debugging)\n  raw: input\n};\n\nreturn [{ json: log }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          208,
+          0
+        ],
+        "id": "b8fcc7bd-2ff3-4bfb-8906-75e9301fdb89",
+        "name": "Normalize — Build Log Record"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "insert into public.chat_turns (\n  trace_id,\n  channel,\n  user_id,\n  chat_id,\n  question,\n  answer,\n  fallback_type,\n  top_score,\n  latency_ms,\n  sources_json,\n  prompt_version,\n  model,\n  is_error,\n  error_json,\n  created_at\n)\nvalues (\n  '{{$json.trace_id}}',\n  '{{$json.channel}}',\n  {{ $json.user_id ? \"'\" + $json.user_id.replace(/'/g, \"''\") + \"'\" : 'null' }},\n  {{ $json.chat_id ? \"'\" + $json.chat_id + \"'\" : 'null' }},\n  {{ $json.request.question ? \"'\" + $json.request.question.replace(/'/g, \"''\") + \"'\" : 'null' }},\n  {{ $json.response.answer ? \"'\" + $json.response.answer.replace(/'/g, \"''\") + \"'\" : 'null' }},\n  {{ $json.decision.mode ? \"'\" + $json.decision.mode + \"'\" : 'null' }},\n  {{ $json.metrics.top_score !== null ? $json.metrics.top_score : 'null' }},\n  {{ $json.metrics.latency_ms !== null ? $json.metrics.latency_ms : 'null' }},\n  '{{ JSON.stringify($json.response.sources || []).replace(/'/g, \"''\") }}'::jsonb,\n  {{ $json.meta.prompt_version ? \"'\" + $json.meta.prompt_version + \"'\" : 'null' }},\n  {{ $json.meta.model ? \"'\" + $json.meta.model + \"'\" : 'null' }},\n  {{ $json.error ? 'true' : 'false' }},\n  {{ $json.error ? (\"'\" + JSON.stringify($json.error).replace(/'/g, \"''\") + \"'::jsonb\") : 'null' }},\n  '{{$json.created_at}}'\n);\n",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          416,
+          0
+        ],
+        "id": "8aa04ccd-3939-43c3-8782-d2ce10fc303e",
+        "name": "DB — Insert log_event",
+        "credentials": {
+          "postgres": {
+            "id": "QLUbzmxXFGSZ8LHx",
+            "name": "AI_Support_Assistant"
+          }
+        },
+        "onError": "continueRegularOutput"
+      }
+    ],
+    "connections": {
+      "When Executed by Another Workflow": {
+        "main": [
+          [
+            {
+              "node": "Normalize — Build Log Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize — Build Log Record": {
+        "main": [
+          [
+            {
+              "node": "DB — Insert log_event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "pinData": {},
+    "versionId": "91a4595a-554f-4c31-801e-e417617558bd",
+    "activeVersionId": null,
+    "versionCounter": 4,
+    "triggerCount": 0,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2025-12-18T14:21:18.432Z",
+        "createdAt": "2025-12-18T14:21:18.432Z",
+        "role": "workflow:owner",
+        "workflowId": "Z8yQeXYTQSnRkl3M",
+        "projectId": "Pe0kjUniwpiBd4qS",
+        "project": {
+          "updatedAt": "2025-11-08T09:00:59.033Z",
+          "createdAt": "2025-11-08T09:00:33.514Z",
+          "id": "Pe0kjUniwpiBd4qS",
+          "name": "admin admin <molodoiars@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null
+        }
+      }
+    ]
+  }
+]

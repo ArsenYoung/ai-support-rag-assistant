@@ -1,0 +1,466 @@
+[
+  {
+    "updatedAt": "2025-12-18T14:29:59.051Z",
+    "createdAt": "2025-12-17T11:33:56.532Z",
+    "id": "jr1yHkOVpFVLhmrk",
+    "name": "TG — Inbound Router (MVP)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "updates": [
+            "message"
+          ],
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegramTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -144,
+          0
+        ],
+        "id": "7c897588-1d6f-42c0-adad-5a30ff1f57dd",
+        "name": "TG — Inbound (Trigger)",
+        "webhookId": "16a13775-0cc3-4892-9837-4a6da2981b42",
+        "credentials": {
+          "telegramApi": {
+            "id": "6Gpc7oPfmYUrN9Ge",
+            "name": "AI_Support_Knowledge_Base_Assistant"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "function uuidv4() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    const v = c === 'x' ? r : (r & 0x3 | 0x8);\n    return v.toString(16);\n  });\n}\n\nfunction safeStr(v) {\n  return (v === null || v === undefined) ? \"\" : String(v);\n}\n\ntry {\n  const trace_id = uuidv4();\n  const t0 = Date.now();\n\n  const msg = $json?.message ?? {};\n  const chat_id = msg?.chat?.id ?? null;\n  const user_id = msg?.from?.id ?? \"unknown\";\n  const text = msg?.text ?? \"\";\n\n  return [{\n    json: {\n      meta: {\n        request_id: trace_id,\n        ts: new Date().toISOString(),\n        channel: \"telegram\",\n        prompt_version: \"v1\",\n        chat_model: \"day1_stub\",\n        embedding_model: \"n/a\",\n        chat_id: chat_id ? Number(chat_id) : null\n      },\n      input: {\n        user_id: safeStr(user_id),\n        question: safeStr(text).trim()\n      },\n      telegram: $json,\n      retrieval: { top_k: 5, hits: [], top_score: null },\n      decision: { mode: \"ALLOW\", reason: \"day1_stub\" },\n      output: { answer: \"\", sources: [] },\n      error: null,\n      timers: { t_start_ms: t0 }\n    }\n  }];\n} catch (e) {\n  const trace_id = uuidv4();\n  return [{\n    json: {\n      meta: {\n        request_id: trace_id,\n        ts: new Date().toISOString(),\n        channel: \"telegram\",\n        prompt_version: \"v1\",\n        chat_model: \"day1_stub\",\n        embedding_model: \"n/a\",\n        chat_id: null\n      },\n      input: { user_id: \"unknown\", question: \"\" },\n      telegram: $json,\n      retrieval: { top_k: 0, hits: [], top_score: null },\n      decision: { mode: \"DENY\", reason: \"build_envelope_error\" },\n      output: { answer: `⚠️ Sorry — something went wrong. Trace ID: ${trace_id}`, sources: [] },\n      error: {\n        message: e?.message || \"build_envelope_error\",\n        node: \"Build Envelope\",\n        stack: e?.stack || null\n      },\n      timers: { t_start_ms: Date.now() }\n    }\n  }];\n}"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          64,
+          0
+        ],
+        "id": "47778b1a-3890-4557-96ad-249d4488a71a",
+        "name": "Envelope — Build v1"
+      },
+      {
+        "parameters": {
+          "chatId": "={{ $json.telegram.message.chat.id }}",
+          "text": "={{ ($json.output.answer || '')\n  .replace(/&/g, '&amp;')\n  .replace(/</g, '&lt;')\n  .replace(/>/g, '&gt;')\n}}",
+          "additionalFields": {
+            "appendAttribution": false,
+            "parse_mode": "HTML"
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          992,
+          272
+        ],
+        "id": "67ceb42c-9862-474b-bf9c-afc52f52953f",
+        "name": "TG — Send Reply",
+        "webhookId": "4470afdf-cbdd-4831-9467-6f55459e53a9",
+        "alwaysOutputData": true,
+        "credentials": {
+          "telegramApi": {
+            "id": "6Gpc7oPfmYUrN9Ge",
+            "name": "AI_Support_Knowledge_Base_Assistant"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "8GCA2MiYJ0R64Ort",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/8GCA2MiYJ0R64Ort",
+            "cachedResultName": "KB — Answer v1"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {},
+            "matchingColumns": [],
+            "schema": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          496,
+          272
+        ],
+        "id": "4aa2c898-b32d-4e17-83a2-787526ae34ac",
+        "name": "Call 'KB — Answer v1'"
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "id": "985a0084-5c42-4a51-b3bf-1a0208dd768b",
+                      "leftValue": "={{$json.input.question}}",
+                      "rightValue": "^\\/source(s)?($|\\s|@)",
+                      "operator": {
+                        "type": "string",
+                        "operation": "regex"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "/source"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{$json.input.question}}",
+                      "rightValue": "^\\/help($|\\s|@)",
+                      "operator": {
+                        "type": "string",
+                        "operation": "regex"
+                      },
+                      "id": "96d741ec-9d27-446c-989e-c147641fcef4"
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "/help"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "id": "16b8cd8b-a553-487b-906e-106c8ba31816",
+                      "leftValue": "={{$json.input.question}}",
+                      "rightValue": "^\\/debug($|\\s|@)",
+                      "operator": {
+                        "type": "string",
+                        "operation": "regex"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "/debug"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "id": "cff3adc9-fad3-43fe-8b55-cd33eb8985eb",
+                      "leftValue": "",
+                      "rightValue": "",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "name": "filter.operator.equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "Default"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.4,
+        "position": [
+          272,
+          -32
+        ],
+        "id": "2247af9f-f2a7-4d25-8109-804390e7d181",
+        "name": "Command Router"
+      },
+      {
+        "parameters": {
+          "jsCode": "return items.map(item => {\n  const j = item.json || {};\n\n  const helpText =\n`Hi! I'm your Knowledge Base Assistant.\n\nI answer strictly based on the knowledge base.\nIf there isn't enough context, I'll ask for clarification or say I don't know.\n\nCommands:\n/sources - list available KB documents\n/debug - show routing details (top_score, mode, top sources)\n/help - show this message\n\nAsk your question in plain text.`;\n\n  return {\n    json: {\n      ...j,\n\n      // IMPORTANT: defaults so DB insert expressions won't break\n      retrieval: j.retrieval ?? {\n        top_score: null,\n        hits: [],\n        gate: { mode: \"COMMAND\", reason: \"help\" }\n      },\n      error: j.error ?? null,\n\n      decision: {\n        ...(j.decision || {}),\n        mode: \"COMMAND\",\n        reason: \"help\"\n      },\n      output: {\n        ...(j.output || {}),\n        answer: helpText,\n        sources: []\n      }\n    }\n  };\n});"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          496,
+          -64
+        ],
+        "id": "b93cfd0c-21f3-4aa7-98a7-0257949995ae",
+        "name": "Cmd — Help (Build Reply)"
+      },
+      {
+        "parameters": {
+          "jsCode": "return items.map(item => {\n  const j = item.json || {};\n\n  const requestId = j.meta?.request_id || \"n/a\";\n  const model = j.meta?.chat_model || \"n/a\";\n  const promptVersion = j.meta?.prompt_version || \"n/a\";\n  const latencyMs = (j.timers?.t_start_ms) ? (Date.now() - j.timers.t_start_ms) : null;\n\n  const text =\n`DEBUG\nrequest_id: ${requestId}\nprompt_version: ${promptVersion}\nmodel: ${model}\nlatency_ms: ${latencyMs}`;\n\n  return {\n    json: {\n      ...j,\n      decision: { mode: \"COMMAND\", reason: \"debug\" },\n      output: { ...(j.output || {}), answer: text, sources: [] },\n      retrieval: j.retrieval ?? { top_score: null, hits: [] },\n      error: null,\n    }\n  };\n});"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          496,
+          112
+        ],
+        "id": "beac4ebc-f2c8-4a00-a2bc-da403cbf9c74",
+        "name": "Cmd — Debug (Build Reply)"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "select\n  regexp_replace(trim(lower(kb_ref)), '[-\\s]+', '_', 'g') as source,\n  count(*) as chunks\nfrom public.kb_chunks\ngroup by 1\norder by chunks desc\nlimit 30;",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          496,
+          -224
+        ],
+        "id": "77e3a6cd-54b8-469b-8123-01c15e633d31",
+        "name": "DB — List sources",
+        "credentials": {
+          "postgres": {
+            "id": "QLUbzmxXFGSZ8LHx",
+            "name": "AI_Support_Assistant"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// 1) Берём ОРИГИНАЛЬНЫЙ Envelope из Command Router\nconst base = $items(\"Command Router\")[0].json;\n\n// 2) Результаты из БД (каждый item — строка)\nconst rows = items.map(i => i.json);\n\n// 3) Формируем список\nconst list = rows.slice(0, 30).map((r, i) => {\n  const name =\n    r.source ||\n    r.kb_ref ||\n    r.doc ||\n    r.source_url ||\n    \"unknown\";\n\n  const chunks = r.chunks ?? \"\";\n  return `${i + 1}) ${name} (${chunks})`;\n});\n\nconst text =\n`SOURCES (top 30)\n${list.length ? list.join(\"\\n\") : \"(empty)\"}`;\n\n// 4) Возвращаем ПОЛНЫЙ Envelope\nreturn [\n  {\n    json: {\n      ...base,\n      decision: { mode: \"COMMAND\", reason: \"sources\" },\n      output: { answer: text, sources: [] },\n      error: null\n    }\n  }\n];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          704,
+          -224
+        ],
+        "id": "52d947e5-6eeb-4910-8ae3-f5b819c5f362",
+        "name": "Cmd — Sources (Build Reply)"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "Z8yQeXYTQSnRkl3M",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/Z8yQeXYTQSnRkl3M",
+            "cachedResultName": "Ops — Log chat_turn"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {},
+            "matchingColumns": [],
+            "schema": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": false
+          }
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          1200,
+          272
+        ],
+        "id": "0ac6a073-97e7-4cb6-9513-6381899456c4",
+        "name": "Call 'Ops — Log chat_turn'"
+      }
+    ],
+    "connections": {
+      "TG — Inbound (Trigger)": {
+        "main": [
+          [
+            {
+              "node": "Envelope — Build v1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Envelope — Build v1": {
+        "main": [
+          [
+            {
+              "node": "Command Router",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Call 'KB — Answer v1'": {
+        "main": [
+          [
+            {
+              "node": "TG — Send Reply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Command Router": {
+        "main": [
+          [
+            {
+              "node": "DB — List sources",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Cmd — Help (Build Reply)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Cmd — Debug (Build Reply)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Call 'KB — Answer v1'",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Cmd — Help (Build Reply)": {
+        "main": [
+          [
+            {
+              "node": "TG — Send Reply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Cmd — Debug (Build Reply)": {
+        "main": [
+          [
+            {
+              "node": "TG — Send Reply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "TG — Send Reply": {
+        "main": [
+          [
+            {
+              "node": "Call 'Ops — Log chat_turn'",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "DB — List sources": {
+        "main": [
+          [
+            {
+              "node": "Cmd — Sources (Build Reply)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Cmd — Sources (Build Reply)": {
+        "main": [
+          [
+            {
+              "node": "TG — Send Reply",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "timeSavedMode": "fixed",
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false,
+      "errorWorkflow": "6YShoMnFelQ0v5B3",
+      "saveDataErrorExecution": "all"
+    },
+    "staticData": null,
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "pinData": {},
+    "versionId": "1040aa81-00c5-47b1-ae57-5bb921cfca9e",
+    "activeVersionId": "1040aa81-00c5-47b1-ae57-5bb921cfca9e",
+    "versionCounter": 114,
+    "triggerCount": 1,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2025-12-17T11:33:56.534Z",
+        "createdAt": "2025-12-17T11:33:56.534Z",
+        "role": "workflow:owner",
+        "workflowId": "jr1yHkOVpFVLhmrk",
+        "projectId": "Pe0kjUniwpiBd4qS",
+        "project": {
+          "updatedAt": "2025-11-08T09:00:59.033Z",
+          "createdAt": "2025-11-08T09:00:33.514Z",
+          "id": "Pe0kjUniwpiBd4qS",
+          "name": "admin admin <molodoiars@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null
+        }
+      }
+    ]
+  }
+]

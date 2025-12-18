@@ -9,3 +9,5 @@
 !prompts
 !prompts/**
 !README.md
+!workflows/
+!workflows/**

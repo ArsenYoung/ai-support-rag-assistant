@@ -44,7 +44,7 @@ flowchart LR
     %% RAG pipeline
     RAG --> QN[Normalize Question]
     QN --> EMB[Create Embedding]
-    EMB --> RET[Vector Search<br/>(kb_chunks)]
+    EMB --> RET[Vector Search (kb_chunks)]
     RET --> GATE{Confidence Gate}
 
     GATE -->|ALLOW| LLM[LLM Answer]
@@ -63,7 +63,7 @@ flowchart LR
     OUT[Send Telegram Reply]
 
     %% Logging
-    OUT --> LOG[Log chat_turn<br/>(Postgres)]
+    OUT --> LOG[Log chat_turn (Postgres)]
 ```
 
 ## n8n workflows
@@ -117,6 +117,3 @@ node tests/unit_tg_router_envelope.test.js
 - OpenAI — embeddings + chat completion
 - Postgres (Supabase + pgvector) — `kb_chunks` + logs
 - Telegram Bot API — user interface
-
-## Status / next steps
-See `plan.md` (Day 3): retries/timeouts, `/help`/`/sources`/`/debug`, workflow exports, README screenshots + demo script.
