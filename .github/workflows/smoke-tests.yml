@@ -8,11 +8,16 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Install jq
         run: |
@@ -24,3 +29,14 @@ jobs:
           N8N_INGEST_URL: ${{ secrets.N8N_INGEST_URL }}
         run: |
           bash tests/smoke_ingest.sh
+
+      - name: Run answer smoke tests (E2E)
+        env:
+          N8N_INGEST_URL: ${{ secrets.N8N_INGEST_URL }}
+          N8N_ANSWER_URL: ${{ secrets.N8N_ANSWER_URL }}
+        run: |
+          bash tests/smoke_answer.sh
+
+      - name: Run unit tests (Answer logic)
+        run: |
+          node tests/unit_answer_logic.test.js
