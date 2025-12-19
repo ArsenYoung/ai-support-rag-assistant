@@ -1,6 +1,5 @@
-[
-  {
-    "updatedAt": "2025-12-18T15:26:13.875Z",
+{
+    "updatedAt": "2025-12-19T07:49:12.685Z",
     "createdAt": "2025-12-17T13:21:37.270Z",
     "id": "jEZyHxY3e36XVLMf",
     "name": "KB — Ingest v1 (Webhook)",
@@ -16,7 +15,7 @@
         "typeVersion": 2,
         "position": [
           1744,
-          16
+          -48
         ],
         "id": "2f5081d2-e16b-452c-960e-4120f94dc6a6",
         "name": "KB — Chunk Docs v1"
@@ -48,7 +47,7 @@
         "typeVersion": 4.3,
         "position": [
           2144,
-          16
+          -48
         ],
         "id": "661ee5d5-bbe0-413e-a09b-dc5517995007",
         "name": "OpenAI — Embeddings (HTTP)",
@@ -69,7 +68,7 @@
         "typeVersion": 2,
         "position": [
           1936,
-          16
+          -48
         ],
         "id": "422f7350-496e-44d0-856f-0108ceb58470",
         "name": "KB — Snapshot Chunk"
@@ -82,7 +81,7 @@
         "typeVersion": 2,
         "position": [
           2352,
-          16
+          -48
         ],
         "id": "41de8fb2-4a72-404b-a909-a30bc3150923",
         "name": "KB — Merge Embedding"
@@ -99,7 +98,7 @@
         "typeVersion": 2.6,
         "position": [
           2576,
-          16
+          -48
         ],
         "id": "a0c04dfc-2e8d-49c1-b0d5-0258b3149017",
         "name": "DB — Upsert kb_chunks",
@@ -170,7 +169,7 @@
         "typeVersion": 2.3,
         "position": [
           832,
-          0
+          -64
         ],
         "id": "9091d201-2d10-4fd7-ba1f-d62c7080149d",
         "name": "IF: KB — Replace?"
@@ -204,7 +203,7 @@
         "typeVersion": 2.3,
         "position": [
           1040,
-          -144
+          -192
         ],
         "id": "746ec9a9-8f9f-43b0-9b4e-0c220485af3d",
         "name": "IF: KB — Has doc_id?"
@@ -221,7 +220,7 @@
         "typeVersion": 2.6,
         "position": [
           1296,
-          -320
+          -368
         ],
         "id": "22aa5e9d-440b-43b0-9c98-e67532a430ba",
         "name": "DB — Delete kb_chunks by doc_id",
@@ -244,7 +243,7 @@
         "typeVersion": 2.6,
         "position": [
           1296,
-          -128
+          -176
         ],
         "id": "38828a3d-dc50-4649-a5f3-369ab53b2101",
         "name": "DB — Delete kb_chunks by doc+section",
@@ -263,7 +262,7 @@
         "typeVersion": 2,
         "position": [
           1520,
-          -224
+          -272
         ],
         "id": "314a579f-8a57-48d1-a327-383c3e1314d4",
         "name": "KB — Restore Payload"
@@ -278,7 +277,7 @@
         "typeVersion": 1.5,
         "position": [
           2992,
-          16
+          -48
         ],
         "id": "47d15abe-0908-45c2-9aff-fa2b17f757b3",
         "name": "KB — Respond"
@@ -291,7 +290,7 @@
         "typeVersion": 2,
         "position": [
           2784,
-          16
+          -48
         ],
         "id": "dd8f3586-cc6e-42f9-8ed4-06f9afe75b7f",
         "name": "KB — Restore For Response"
@@ -350,40 +349,10 @@
         "typeVersion": 1.5,
         "position": [
           832,
-          176
+          128
         ],
         "id": "816909a2-be4d-42d9-8336-6870527a566d",
         "name": "Respond to Webhook"
-      },
-      {
-        "parameters": {
-          "workflowId": {
-            "__rl": true,
-            "value": "Z8yQeXYTQSnRkl3M",
-            "mode": "list",
-            "cachedResultUrl": "/workflow/Z8yQeXYTQSnRkl3M",
-            "cachedResultName": "Ops — Log chat_turn"
-          },
-          "workflowInputs": {
-            "mappingMode": "defineBelow",
-            "value": {},
-            "matchingColumns": [],
-            "schema": [],
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": true
-          },
-          "options": {
-            "waitForSubWorkflow": false
-          }
-        },
-        "type": "n8n-nodes-base.executeWorkflow",
-        "typeVersion": 1.3,
-        "position": [
-          3216,
-          160
-        ],
-        "id": "5768e350-ccf7-439a-bf48-a2e16a8ea35f",
-        "name": "Ops — Log chat_turn"
       }
     ],
     "connections": {
@@ -564,24 +533,12 @@
       },
       "KB — Respond": {
         "main": [
-          [
-            {
-              "node": "Ops — Log chat_turn",
-              "type": "main",
-              "index": 0
-            }
-          ]
+          []
         ]
       },
       "Respond to Webhook": {
         "main": [
-          [
-            {
-              "node": "Ops — Log chat_turn",
-              "type": "main",
-              "index": 0
-            }
-          ]
+          []
         ]
       }
     },
@@ -593,11 +550,10 @@
       "templateCredsSetupCompleted": true
     },
     "pinData": {},
-    "versionId": "3c7d3b93-82b5-4877-8c59-656b90ac2dc7",
-    "activeVersionId": "3c7d3b93-82b5-4877-8c59-656b90ac2dc7",
-    "versionCounter": 38,
+    "versionId": "c959229b-06bf-49e8-862e-d31822b3515e",
+    "activeVersionId": "c959229b-06bf-49e8-862e-d31822b3515e",
+    "versionCounter": 44,
     "triggerCount": 1,
-    "tags": [],
     "shared": [
       {
         "updatedAt": "2025-12-17T13:21:37.273Z",
@@ -612,9 +568,591 @@
           "name": "admin admin <molodoiars@gmail.com>",
           "type": "personal",
           "icon": null,
-          "description": null
+          "description": null,
+          "projectRelations": [
+            {
+              "updatedAt": "2025-11-08T09:00:33.514Z",
+              "createdAt": "2025-11-08T09:00:33.514Z",
+              "userId": "07806a46-b67e-4b6f-9ee2-8c3790bb1f7f",
+              "projectId": "Pe0kjUniwpiBd4qS",
+              "user": {
+                "updatedAt": "2025-12-19T09:28:54.000Z",
+                "createdAt": "2025-11-08T09:00:32.909Z",
+                "id": "07806a46-b67e-4b6f-9ee2-8c3790bb1f7f",
+                "email": "molodoiars@gmail.com",
+                "firstName": "admin",
+                "lastName": "admin",
+                "personalizationAnswers": {
+                  "version": "v4",
+                  "personalization_survey_submitted_at": "2025-11-08T09:01:03.436Z",
+                  "personalization_survey_n8n_version": "1.118.1"
+                },
+                "settings": {
+                  "userActivated": true,
+                  "easyAIWorkflowOnboarded": true,
+                  "firstSuccessfulWorkflowId": "GbK4JsX36MFOisoQ",
+                  "userActivatedAt": 1765198162186,
+                  "npsSurvey": {
+                    "waitingForResponse": true,
+                    "ignoredCount": 1,
+                    "lastShownAt": 1765550520070
+                  }
+                },
+                "disabled": false,
+                "mfaEnabled": false,
+                "lastActiveAt": "0NaN-aN-aN",
+                "isPending": false
+              }
+            }
+          ]
         }
       }
-    ]
+    ],
+    "tags": [],
+    "activeVersion": {
+      "updatedAt": "2025-12-19T07:49:12.694Z",
+      "createdAt": "2025-12-19T07:49:12.694Z",
+      "versionId": "c959229b-06bf-49e8-862e-d31822b3515e",
+      "workflowId": "jEZyHxY3e36XVLMf",
+      "nodes": [
+        {
+          "parameters": {
+            "jsCode": "function slug(s) {\n  return String(s)\n    .toLowerCase()\n    .trim()\n    .replace(/[\\s\\/]+/g, \"-\")\n    .replace(/[^a-z0-9\\-_]+/g, \"\")\n    .slice(0, 80);\n}\n\nconst { kb_ref, doc, section, source_url, tags, doc_id, text } = $json;\n\nconst TARGET = 850;\nconst OVERLAP = 120;\n\nconst hard = String(text).replace(/\\r\\n/g, \"\\n\").trim();\nconst parts = hard.split(/\\n{2,}/g).map(s => s.trim()).filter(Boolean);\n\nlet chunks = [];\nlet buf = \"\";\n\nfunction pushBuf() {\n  const t = buf.trim();\n  if (t) chunks.push(t);\n}\n\nfor (const p of parts) {\n  if ((buf + \"\\n\\n\" + p).length <= TARGET) {\n    buf = buf ? (buf + \"\\n\\n\" + p) : p;\n  } else {\n    pushBuf();\n    const tail = buf.slice(Math.max(0, buf.length - OVERLAP));\n    buf = (tail ? tail + \"\\n\\n\" : \"\") + p;\n  }\n}\npushBuf();\n\nconst now = new Date().toISOString();\n\nreturn chunks.map((chunk_text, i) => {\n  const chunk_id = `${kb_ref}__${slug(doc)}__${slug(section)}__${i}`;\n\n  return {\n    json: {\n      chunk_id,\n      kb_ref,\n      doc,\n      section,\n      source_url: source_url || null,\n      doc_id: doc_id || null,\n      chunk_text,\n      chunk_index: i,\n      tags: Array.isArray(tags) ? tags : null,\n      updated_at: now\n    }\n  };\n});"
+          },
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            1744,
+            -48
+          ],
+          "id": "2f5081d2-e16b-452c-960e-4120f94dc6a6",
+          "name": "KB — Chunk Docs v1"
+        },
+        {
+          "parameters": {
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "authentication": "predefinedCredentialType",
+            "nodeCredentialType": "openAiApi",
+            "sendBody": true,
+            "bodyParameters": {
+              "parameters": [
+                {
+                  "name": "model",
+                  "value": "text-embedding-3-small"
+                },
+                {
+                  "name": "input",
+                  "value": "=={{$json.embedding_input}}"
+                }
+              ]
+            },
+            "options": {
+              "timeout": 10000
+            }
+          },
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 4.3,
+          "position": [
+            2144,
+            -48
+          ],
+          "id": "661ee5d5-bbe0-413e-a09b-dc5517995007",
+          "name": "OpenAI — Embeddings (HTTP)",
+          "retryOnFail": true,
+          "credentials": {
+            "openAiApi": {
+              "id": "j2qEVgJkVL5JMOK6",
+              "name": "OpenAi account"
+            }
+          },
+          "onError": "continueRegularOutput"
+        },
+        {
+          "parameters": {
+            "jsCode": "const tags_json = Array.isArray($json.tags) ? JSON.stringify($json.tags) : null;\n\nreturn [{\n  json: {\n    ...$json,\n    embedding_input: $json.chunk_text,\n    tags_json\n  }\n}];"
+          },
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            1936,
+            -48
+          ],
+          "id": "422f7350-496e-44d0-856f-0108ceb58470",
+          "name": "KB — Snapshot Chunk"
+        },
+        {
+          "parameters": {
+            "jsCode": "const chunk = $items(\"KB — Snapshot Chunk\")[0].json;\nconst emb = $json?.data?.[0]?.embedding;\n\nif (!Array.isArray(emb)) {\n  throw new Error(\"No embedding found at data[0].embedding\");\n}\n\nconst embedding_vector = `[${emb.join(\",\")}]`;\nreturn [{\n  json: {\n    ...chunk,\n    embedding: embedding_vector\n  }\n}];"
+          },
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            2352,
+            -48
+          ],
+          "id": "41de8fb2-4a72-404b-a909-a30bc3150923",
+          "name": "KB — Merge Embedding"
+        },
+        {
+          "parameters": {
+            "operation": "executeQuery",
+            "query": "with p as (\n  select $1::jsonb as j\n)\ninsert into public.kb_chunks\n  (chunk_id, kb_ref, doc, section, doc_id, chunk_index, content, chunk_text, source_url, embedding, tags, updated_at)\nselect\n  (j->>'chunk_id')::text,\n  (j->>'kb_ref')::text,\n  (j->>'doc')::text,\n  nullif(j->>'section','')::text,\n  nullif(j->>'doc_id','')::text,\n  (j->>'chunk_index')::int,\n\n  -- content заполняем тем же текстом, чтобы NOT NULL не ломался\n  nullif(j->>'chunk_text','')::text,\n\n  nullif(j->>'chunk_text','')::text,\n  nullif(j->>'source_url','')::text,\n  (j->>'embedding')::vector,\n  case when j ? 'tags' then (j->'tags')::jsonb else null end,\n  coalesce(nullif(j->>'updated_at','')::timestamptz, now())\nfrom p\non conflict (chunk_id) do update set\n  kb_ref      = excluded.kb_ref,\n  doc         = excluded.doc,\n  section     = excluded.section,\n  doc_id      = excluded.doc_id,\n  chunk_index = excluded.chunk_index,\n  content     = excluded.content,\n  chunk_text  = excluded.chunk_text,\n  source_url  = excluded.source_url,\n  embedding   = excluded.embedding,\n  tags        = excluded.tags,\n  updated_at  = excluded.updated_at;",
+            "options": {
+              "queryReplacement": "=={{ JSON.stringify({\n  chunk_id: $json.chunk_id,\n  kb_ref: $json.kb_ref,\n  doc: $json.doc,\n  section: $json.section ?? \"\",\n  doc_id: $json.doc_id ?? \"\",\n  chunk_index: $json.chunk_index,\n  chunk_text: $json.chunk_text,\n  source_url: $json.source_url ?? \"\",\n  embedding: $json.embedding,      // строка \"[...]\" для pgvector\n  tags: $json.tags ?? null,\n  updated_at: $json.updated_at ?? null\n}) }}"
+            }
+          },
+          "type": "n8n-nodes-base.postgres",
+          "typeVersion": 2.6,
+          "position": [
+            2576,
+            -48
+          ],
+          "id": "a0c04dfc-2e8d-49c1-b0d5-0258b3149017",
+          "name": "DB — Upsert kb_chunks",
+          "credentials": {
+            "postgres": {
+              "id": "QLUbzmxXFGSZ8LHx",
+              "name": "AI_Support_Assistant"
+            }
+          },
+          "onError": "continueRegularOutput"
+        },
+        {
+          "parameters": {
+            "httpMethod": "POST",
+            "path": "kb/ingest",
+            "responseMode": "responseNode",
+            "options": {}
+          },
+          "type": "n8n-nodes-base.webhook",
+          "typeVersion": 2.1,
+          "position": [
+            208,
+            16
+          ],
+          "id": "da6d8f74-040c-455a-8bf5-203aaa951ea8",
+          "name": "KB — Ingest Webhook",
+          "webhookId": "f2a6e09c-d367-4dfe-bee4-df71b338e49e"
+        },
+        {
+          "parameters": {
+            "jsCode": "const b = $json?.body ?? $json;\n\nfunction cleanStr(v) {\n  return (v ?? \"\").toString().trim();\n}\n\nconst kb_ref = cleanStr(b.kb_ref);\nconst doc = cleanStr(b.doc);\nconst section = cleanStr(b.section);\nconst text = cleanStr(b.text);\n\nconst missing = [];\nif (!kb_ref) missing.push(\"kb_ref\");\nif (!doc) missing.push(\"doc\");\nif (!section) missing.push(\"section\");\nif (!text) missing.push(\"text\");\n\nif (missing.length) {\n  return [{\n    json: {\n      ok: false,\n      error: {\n        code: \"missing_required_fields\",\n        missing\n      }\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ok: true,\n    kb_ref,\n    doc,\n    section,\n    source_url: b.source_url || null,\n    tags: Array.isArray(b.tags) ? b.tags : null,\n    doc_id: b.doc_id || null,\n    replace: !!b.replace,\n    text\n  }\n}];"
+          },
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            416,
+            16
+          ],
+          "id": "3a06bc34-2a6c-4c7a-a739-c4d584dfb1c7",
+          "name": "Validate Input"
+        },
+        {
+          "parameters": {
+            "conditions": {
+              "options": {
+                "caseSensitive": true,
+                "leftValue": "",
+                "typeValidation": "strict",
+                "version": 3
+              },
+              "conditions": [
+                {
+                  "id": "99f61172-b74a-4acf-b9a7-13f16f208719",
+                  "leftValue": "={{$json.replace}}",
+                  "rightValue": "",
+                  "operator": {
+                    "type": "boolean",
+                    "operation": "true",
+                    "singleValue": true
+                  }
+                }
+              ],
+              "combinator": "and"
+            },
+            "options": {}
+          },
+          "type": "n8n-nodes-base.if",
+          "typeVersion": 2.3,
+          "position": [
+            832,
+            -64
+          ],
+          "id": "9091d201-2d10-4fd7-ba1f-d62c7080149d",
+          "name": "IF: KB — Replace?"
+        },
+        {
+          "parameters": {
+            "conditions": {
+              "options": {
+                "caseSensitive": true,
+                "leftValue": "",
+                "typeValidation": "strict",
+                "version": 3
+              },
+              "conditions": [
+                {
+                  "id": "3efcaa7a-6bc4-4d97-a386-ccb539607719",
+                  "leftValue": "={{$json.doc_id && $json.doc_id !== \"\"}}",
+                  "rightValue": "",
+                  "operator": {
+                    "type": "boolean",
+                    "operation": "true",
+                    "singleValue": true
+                  }
+                }
+              ],
+              "combinator": "and"
+            },
+            "options": {}
+          },
+          "type": "n8n-nodes-base.if",
+          "typeVersion": 2.3,
+          "position": [
+            1040,
+            -192
+          ],
+          "id": "746ec9a9-8f9f-43b0-9b4e-0c220485af3d",
+          "name": "IF: KB — Has doc_id?"
+        },
+        {
+          "parameters": {
+            "operation": "executeQuery",
+            "query": "delete from public.kb_chunks\nwhere kb_ref = $1 and doc_id = $2;",
+            "options": {
+              "queryReplacement": "={{$json.kb_ref}}, {{$json.doc_id}}"
+            }
+          },
+          "type": "n8n-nodes-base.postgres",
+          "typeVersion": 2.6,
+          "position": [
+            1296,
+            -368
+          ],
+          "id": "22aa5e9d-440b-43b0-9c98-e67532a430ba",
+          "name": "DB — Delete kb_chunks by doc_id",
+          "credentials": {
+            "postgres": {
+              "id": "QLUbzmxXFGSZ8LHx",
+              "name": "AI_Support_Assistant"
+            }
+          }
+        },
+        {
+          "parameters": {
+            "operation": "executeQuery",
+            "query": "delete from public.kb_chunks\nwhere kb_ref = $1 and doc = $2 and section = $3;",
+            "options": {
+              "queryReplacement": "={{$json.kb_ref}}, {{$json.doc_id}}, {{$json.section}}"
+            }
+          },
+          "type": "n8n-nodes-base.postgres",
+          "typeVersion": 2.6,
+          "position": [
+            1296,
+            -176
+          ],
+          "id": "38828a3d-dc50-4649-a5f3-369ab53b2101",
+          "name": "DB — Delete kb_chunks by doc+section",
+          "credentials": {
+            "postgres": {
+              "id": "QLUbzmxXFGSZ8LHx",
+              "name": "AI_Support_Assistant"
+            }
+          }
+        },
+        {
+          "parameters": {
+            "jsCode": "// Берём исходный нормализованный item из ноды Validate Input\nconst original = $items(\"Validate Input\")[0].json;\nreturn [{ json: original }];"
+          },
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            1520,
+            -272
+          ],
+          "id": "314a579f-8a57-48d1-a327-383c3e1314d4",
+          "name": "KB — Restore Payload"
+        },
+        {
+          "parameters": {
+            "options": {
+              "responseCode": 200
+            }
+          },
+          "type": "n8n-nodes-base.respondToWebhook",
+          "typeVersion": 1.5,
+          "position": [
+            2992,
+            -48
+          ],
+          "id": "47d15abe-0908-45c2-9aff-fa2b17f757b3",
+          "name": "KB — Respond"
+        },
+        {
+          "parameters": {
+            "jsCode": "const original = $items(\"Validate Input\")[0].json;\nconst chunksCount = $items(\"KB — Chunk Docs v1\").length;\nconst lastChunk = $items(\"KB — Chunk Docs v1\")[chunksCount - 1]?.json;\n\nreturn [{\n  json: {\n    ok: true,\n    kb_ref: original.kb_ref,\n    doc: original.doc,\n    section: original.section,\n    doc_id: original.doc_id,\n    replace: original.replace,\n    chunks_upserted: chunksCount,\n    last_chunk_id: lastChunk?.chunk_id ?? null\n  }\n}];"
+          },
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            2784,
+            -48
+          ],
+          "id": "dd8f3586-cc6e-42f9-8ed4-06f9afe75b7f",
+          "name": "KB — Restore For Response"
+        },
+        {
+          "parameters": {
+            "conditions": {
+              "options": {
+                "caseSensitive": true,
+                "leftValue": "",
+                "typeValidation": "strict",
+                "version": 3
+              },
+              "conditions": [
+                {
+                  "id": "d084a3c5-a7ce-497c-acbf-878ce597599f",
+                  "leftValue": "={{$json.ok}}",
+                  "rightValue": "",
+                  "operator": {
+                    "type": "boolean",
+                    "operation": "true",
+                    "singleValue": true
+                  }
+                }
+              ],
+              "combinator": "and"
+            },
+            "options": {}
+          },
+          "type": "n8n-nodes-base.if",
+          "typeVersion": 2.3,
+          "position": [
+            624,
+            16
+          ],
+          "id": "faa206aa-ba0d-4cce-820b-ba46724d4ee1",
+          "name": "IF — Validation OK?"
+        },
+        {
+          "parameters": {
+            "respondWith": "text",
+            "responseBody": "={{ JSON.stringify($json) }}",
+            "options": {
+              "responseCode": 400,
+              "responseHeaders": {
+                "entries": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ]
+              }
+            }
+          },
+          "type": "n8n-nodes-base.respondToWebhook",
+          "typeVersion": 1.5,
+          "position": [
+            832,
+            128
+          ],
+          "id": "816909a2-be4d-42d9-8336-6870527a566d",
+          "name": "Respond to Webhook"
+        }
+      ],
+      "connections": {
+        "KB — Chunk Docs v1": {
+          "main": [
+            [
+              {
+                "node": "KB — Snapshot Chunk",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "KB — Snapshot Chunk": {
+          "main": [
+            [
+              {
+                "node": "OpenAI — Embeddings (HTTP)",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "OpenAI — Embeddings (HTTP)": {
+          "main": [
+            [
+              {
+                "node": "KB — Merge Embedding",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "KB — Merge Embedding": {
+          "main": [
+            [
+              {
+                "node": "DB — Upsert kb_chunks",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "KB — Ingest Webhook": {
+          "main": [
+            [
+              {
+                "node": "Validate Input",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Validate Input": {
+          "main": [
+            [
+              {
+                "node": "IF — Validation OK?",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "IF: KB — Replace?": {
+          "main": [
+            [
+              {
+                "node": "IF: KB — Has doc_id?",
+                "type": "main",
+                "index": 0
+              }
+            ],
+            [
+              {
+                "node": "KB — Chunk Docs v1",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "IF: KB — Has doc_id?": {
+          "main": [
+            [
+              {
+                "node": "DB — Delete kb_chunks by doc_id",
+                "type": "main",
+                "index": 0
+              }
+            ],
+            [
+              {
+                "node": "DB — Delete kb_chunks by doc+section",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "DB — Delete kb_chunks by doc+section": {
+          "main": [
+            [
+              {
+                "node": "KB — Restore Payload",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "DB — Delete kb_chunks by doc_id": {
+          "main": [
+            [
+              {
+                "node": "KB — Restore Payload",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "KB — Restore Payload": {
+          "main": [
+            [
+              {
+                "node": "KB — Chunk Docs v1",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "DB — Upsert kb_chunks": {
+          "main": [
+            [
+              {
+                "node": "KB — Restore For Response",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "KB — Restore For Response": {
+          "main": [
+            [
+              {
+                "node": "KB — Respond",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "IF — Validation OK?": {
+          "main": [
+            [
+              {
+                "node": "IF: KB — Replace?",
+                "type": "main",
+                "index": 0
+              }
+            ],
+            [
+              {
+                "node": "Respond to Webhook",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "KB — Respond": {
+          "main": [
+            []
+          ]
+        },
+        "Respond to Webhook": {
+          "main": [
+            []
+          ]
+        }
+      },
+      "authors": "admin admin",
+      "name": null,
+      "description": null
+    }
   }
-]
+}

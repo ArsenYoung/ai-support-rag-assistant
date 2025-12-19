@@ -1,6 +1,5 @@
-[
-  {
-    "updatedAt": "2025-12-18T14:39:58.974Z",
+{
+    "updatedAt": "2025-12-19T08:04:05.086Z",
     "createdAt": "2025-12-18T14:21:18.427Z",
     "id": "Z8yQeXYTQSnRkl3M",
     "name": "Ops — Log chat_turn",
@@ -23,7 +22,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Normalize any incoming payload into a canonical log record\n\nconst input = $json || {};\nconst now = new Date().toISOString();\n\nconst trace_id =\n  input.trace_id ||\n  input.meta?.request_id ||\n  `trace_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;\n\nconst log = {\n  trace_id,\n\n  ts: now,\n\n  channel:\n    input.channel ||\n    input.meta?.channel ||\n    \"unknown\",\n\n  event:\n    input.event ||\n    input.decision?.mode?.toLowerCase() ||\n    \"unknown\",\n\n  user_id:\n    input.input?.user_id ||\n    input.telegram?.message?.from?.id ||\n    null,\n\n  chat_id:\n    input.meta?.chat_id ||\n    input.telegram?.message?.chat?.id ||\n    null,\n\n  model:\n    input.meta?.chat_model ||\n    input.model ||\n    null,\n\n  prompt_version:\n    input.meta?.prompt_version ||\n    null,\n\n  latency_ms:\n    input.latency_ms ||\n    null,\n\n  decision: input.decision || null,\n  error: input.error || null,\n\n  // raw payload snapshot (optional, but great for debugging)\n  raw: input\n};\n\nreturn [{ json: log }];"
+          "jsCode": "const input = $json || {};\n\nconst err = input.error ?? null;\n\nreturn [{\n  json: {\n    trace_id: input.trace_id ?? input.meta?.request_id ?? null,\n    channel: input.channel ?? input.meta?.channel ?? \"unknown\",\n    user_id: input.input?.user_id ?? null,\n    question: input.input?.question ?? null,\n    answer: input.output?.answer ?? null,\n    fallback_type: input.decision?.mode ?? null,\n    top_score: input.retrieval?.top_score ?? null,\n    sources_json: { items: input.output?.sources ?? [] },\n    prompt_version: input.meta?.prompt_version ?? null,\n    model: input.meta?.chat_model ?? input.meta?.model ?? null,\n    latency_ms: input.latency_ms ?? input.timers?.latency_ms ?? null,\n    is_error: err !== null,\n    error_json: err,\n    retry_enabled: true,\n    retry_max_tries: 3,\n    retry_wait_ms: 1000,\n  }\n}];\n"
         },
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
@@ -36,18 +35,209 @@
       },
       {
         "parameters": {
-          "operation": "executeQuery",
-          "query": "insert into public.chat_turns (\n  trace_id,\n  channel,\n  user_id,\n  chat_id,\n  question,\n  answer,\n  fallback_type,\n  top_score,\n  latency_ms,\n  sources_json,\n  prompt_version,\n  model,\n  is_error,\n  error_json,\n  created_at\n)\nvalues (\n  '{{$json.trace_id}}',\n  '{{$json.channel}}',\n  {{ $json.user_id ? \"'\" + $json.user_id.replace(/'/g, \"''\") + \"'\" : 'null' }},\n  {{ $json.chat_id ? \"'\" + $json.chat_id + \"'\" : 'null' }},\n  {{ $json.request.question ? \"'\" + $json.request.question.replace(/'/g, \"''\") + \"'\" : 'null' }},\n  {{ $json.response.answer ? \"'\" + $json.response.answer.replace(/'/g, \"''\") + \"'\" : 'null' }},\n  {{ $json.decision.mode ? \"'\" + $json.decision.mode + \"'\" : 'null' }},\n  {{ $json.metrics.top_score !== null ? $json.metrics.top_score : 'null' }},\n  {{ $json.metrics.latency_ms !== null ? $json.metrics.latency_ms : 'null' }},\n  '{{ JSON.stringify($json.response.sources || []).replace(/'/g, \"''\") }}'::jsonb,\n  {{ $json.meta.prompt_version ? \"'\" + $json.meta.prompt_version + \"'\" : 'null' }},\n  {{ $json.meta.model ? \"'\" + $json.meta.model + \"'\" : 'null' }},\n  {{ $json.error ? 'true' : 'false' }},\n  {{ $json.error ? (\"'\" + JSON.stringify($json.error).replace(/'/g, \"''\") + \"'::jsonb\") : 'null' }},\n  '{{$json.created_at}}'\n);\n",
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": {
+            "__rl": true,
+            "value": "chat_turns",
+            "mode": "list",
+            "cachedResultName": "chat_turns"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData",
+            "value": {
+              "is_error": false,
+              "retry_enabled": false,
+              "id": 0,
+              "top_score": 0,
+              "latency_ms": 0,
+              "retry_max_tries": 0,
+              "retry_wait_ms": 0
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "trace_id",
+                "displayName": "trace_id",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "user_id",
+                "displayName": "user_id",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "question",
+                "displayName": "question",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "answer",
+                "displayName": "answer",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "top_score",
+                "displayName": "top_score",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "fallback_type",
+                "displayName": "fallback_type",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "prompt_version",
+                "displayName": "prompt_version",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "model",
+                "displayName": "model",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "latency_ms",
+                "displayName": "latency_ms",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "sources_json",
+                "displayName": "sources_json",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "object",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "created_at",
+                "displayName": "created_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "is_error",
+                "displayName": "is_error",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "error_json",
+                "displayName": "error_json",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "object",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "channel",
+                "displayName": "channel",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "retry_enabled",
+                "displayName": "retry_enabled",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "retry_max_tries",
+                "displayName": "retry_max_tries",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "retry_wait_ms",
+                "displayName": "retry_wait_ms",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
           "options": {}
         },
         "type": "n8n-nodes-base.postgres",
         "typeVersion": 2.6,
         "position": [
-          416,
+          432,
           0
         ],
-        "id": "8aa04ccd-3939-43c3-8782-d2ce10fc303e",
-        "name": "DB — Insert log_event",
+        "id": "14e68e9c-affc-4a0a-85cd-3071f766db11",
+        "name": "Insert rows in a table",
         "credentials": {
           "postgres": {
             "id": "QLUbzmxXFGSZ8LHx",
@@ -73,7 +263,7 @@
         "main": [
           [
             {
-              "node": "DB — Insert log_event",
+              "node": "Insert rows in a table",
               "type": "main",
               "index": 0
             }
@@ -88,12 +278,115 @@
     "meta": {
       "templateCredsSetupCompleted": true
     },
-    "pinData": {},
-    "versionId": "91a4595a-554f-4c31-801e-e417617558bd",
+    "pinData": {
+      "When Executed by Another Workflow": [
+        {
+          "json": {
+            "meta": {
+              "request_id": "26534989-c883-44d4-bb21-c7b8a6d548a2",
+              "ts": "2025-12-19T07:51:54.237Z",
+              "channel": "telegram",
+              "prompt_version": "v1",
+              "chat_model": "day1_stub",
+              "embedding_model": "text-embedding-3-small",
+              "chat_id": 168487641
+            },
+            "input": {
+              "user_id": "168487641",
+              "question": "How do I request access?"
+            },
+            "telegram": {
+              "update_id": 15493835,
+              "message": {
+                "message_id": 191,
+                "from": {
+                  "id": 168487641,
+                  "is_bot": false,
+                  "first_name": "Arseniy",
+                  "last_name": "Ostroumov",
+                  "username": "arseniy_ostroumov",
+                  "language_code": "en"
+                },
+                "chat": {
+                  "id": 168487641,
+                  "first_name": "Arseniy",
+                  "last_name": "Ostroumov",
+                  "username": "arseniy_ostroumov",
+                  "type": "private"
+                },
+                "date": 1766130713,
+                "text": "How do I request access?"
+              }
+            },
+            "decision": {
+              "mode": "ALLOW",
+              "reason": "llm_override_high_score"
+            },
+            "output": {
+              "answer": "To request access, submit a ticket with your email, role, and the system name. Access is granted within 1 business day.\n\nSources:\n1) Access request process — Onboarding\nhttps://example.com/access",
+              "sources": [
+                {
+                  "n": 1,
+                  "chunk_id": "demo-support__access-request-process__0",
+                  "doc": "Access request process",
+                  "section": "Onboarding",
+                  "source_url": "https://example.com/access",
+                  "score": 0.536654523289953
+                }
+              ],
+              "mode": "ALLOW",
+              "answer_text": "To request access, submit a ticket with your email, role, and the system name. Access is granted within 1 business day.",
+              "clarify": [],
+              "reply_text": "To request access, submit a ticket with your email, role, and the system name. Access is granted within 1 business day.\n\nSources:\n1) Access request process — Onboarding\nhttps://example.com/access"
+            },
+            "retrieval": {
+              "top_k": 5,
+              "hits": [
+                {
+                  "n": 1,
+                  "chunk_id": "demo-support__access-request-process__0",
+                  "doc": "Access request process",
+                  "section": "Onboarding",
+                  "source_url": "https://example.com/access",
+                  "score": 0.536654523289953,
+                  "distance": 0.863396201096961
+                },
+                {
+                  "n": 2,
+                  "chunk_id": "demo-support__support-sla__0",
+                  "doc": "Support SLA",
+                  "section": "Response time",
+                  "source_url": "https://example.com/sla",
+                  "score": 0.451391778792987,
+                  "distance": 1.21537043203131
+                },
+                {
+                  "n": 3,
+                  "chunk_id": "demo-support__cancellation-policy__0",
+                  "doc": "Cancellation policy",
+                  "section": "Refunds",
+                  "source_url": "https://example.com/cancel",
+                  "score": 0.43284176820088,
+                  "distance": 1.31031308313089
+                }
+              ],
+              "top_score": 0.536654523289953,
+              "hits_count": 3
+            },
+            "timers": {
+              "t_start_ms": 1766130714237,
+              "t_after_embed_ms": 1766130716640
+            },
+            "error": null,
+            "channel": "telegram"
+          }
+        }
+      ]
+    },
+    "versionId": "96e046e4-d64b-40b6-9578-a2e0b3bb3cfd",
     "activeVersionId": null,
-    "versionCounter": 4,
+    "versionCounter": 18,
     "triggerCount": 0,
-    "tags": [],
     "shared": [
       {
         "updatedAt": "2025-12-18T14:21:18.432Z",
@@ -108,9 +401,47 @@
           "name": "admin admin <molodoiars@gmail.com>",
           "type": "personal",
           "icon": null,
-          "description": null
+          "description": null,
+          "projectRelations": [
+            {
+              "updatedAt": "2025-11-08T09:00:33.514Z",
+              "createdAt": "2025-11-08T09:00:33.514Z",
+              "userId": "07806a46-b67e-4b6f-9ee2-8c3790bb1f7f",
+              "projectId": "Pe0kjUniwpiBd4qS",
+              "user": {
+                "updatedAt": "2025-12-19T09:29:14.000Z",
+                "createdAt": "2025-11-08T09:00:32.909Z",
+                "id": "07806a46-b67e-4b6f-9ee2-8c3790bb1f7f",
+                "email": "molodoiars@gmail.com",
+                "firstName": "admin",
+                "lastName": "admin",
+                "personalizationAnswers": {
+                  "version": "v4",
+                  "personalization_survey_submitted_at": "2025-11-08T09:01:03.436Z",
+                  "personalization_survey_n8n_version": "1.118.1"
+                },
+                "settings": {
+                  "userActivated": true,
+                  "easyAIWorkflowOnboarded": true,
+                  "firstSuccessfulWorkflowId": "GbK4JsX36MFOisoQ",
+                  "userActivatedAt": 1765198162186,
+                  "npsSurvey": {
+                    "waitingForResponse": true,
+                    "ignoredCount": 1,
+                    "lastShownAt": 1765550520070
+                  }
+                },
+                "disabled": false,
+                "mfaEnabled": false,
+                "lastActiveAt": "0NaN-aN-aN",
+                "isPending": false
+              }
+            }
+          ]
         }
       }
-    ]
+    ],
+    "tags": [],
+    "activeVersion": null
   }
-]
+}
