@@ -34,3 +34,10 @@ bash tests/smoke_answer.sh
 
 ## Tech
 n8n · OpenAI · Postgres/pgvector (Supabase) · Telegram Bot API
+
+## Screenshots
+<img width="1843" height="841" alt="Screenshot from 2025-12-19 13-30-03" src="https://github.com/user-attachments/assets/a7d9d6c9-0cd2-4f04-8382-52a7fc252be8" />
+<img width="1842" height="435" alt="Screenshot from 2025-12-19 13-30-42" src="https://github.com/user-attachments/assets/503afc03-6556-4452-bebd-3f8a17f8fb8e" />
+<img width="1843" height="366" alt="Screenshot from 2025-12-19 13-31-06" src="https://github.com/user-attachments/assets/74c1034f-e6f1-4124-b1c8-dd288b972ca6" />
+<img width="1848" height="494" alt="Screenshot from 2025-12-19 13-31-24" src="https://github.com/user-attachments/assets/d68cd2cd-4ce0-4a7e-9544-c95e6953cda2" />
+
