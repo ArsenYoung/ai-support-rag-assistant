@@ -1,0 +1,239 @@
+{
+  "name": "SUB WF Invite Create",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -656,
+        256
+      ],
+      "id": "5cb6e96e-a94e-4169-82dc-de7fcaae12f7",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3b279e97-3d85-482d-bb8e-335fe4e22bf5",
+              "leftValue": "={{$json.role === 'admin'}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -16,
+        272
+      ],
+      "id": "e3052e8c-bfe5-4b3c-af23-4e7001be55e3",
+      "name": "IF role is 'admin'"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chat_id =\n  $json?.meta?.chat_id ??\n  $json?.chat_id ??\n  null;\n\nconst reply_text = \"⛔ Admin only.\";\n\nreturn [{\n  json: {\n    ...$json,\n    ok: false,\n    code: \"ADMIN_ONLY\",\n    chat_id,\n    output: {\n      ...( $json.output ?? {} ),\n      reply_text,\n    },\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        368
+      ],
+      "id": "d20547a9-bbcc-400c-8c69-4cab3fa901c3",
+      "name": "Return admin only"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require(\"crypto\");\n\n// raw token (что покажем пользователю)\nconst token = crypto.randomBytes(24).toString(\"hex\"); // 48 hex chars\n\n// hash token (что будем хранить в БД)\nconst token_hash = crypto.createHash(\"sha256\").update(token).digest(\"hex\");\n\nreturn [{\n  json: {\n    ...$json,\n    token,\n    token_hash,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        144
+      ],
+      "id": "0a611d57-ef89-4f5c-8c19-ad3b85cb102d",
+      "name": "Make token"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into public.demo_invites (token, expires_at)\nvalues ($1, now() + interval '7 days')\nreturning token, expires_at;",
+        "options": {
+          "queryReplacement": "={{$json.token}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        368,
+        0
+      ],
+      "id": "a4594cc9-fbf4-4ad9-af8b-5cdff20aaee1",
+      "name": "Insert invite",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const chat_id =\n  $json?.meta?.chat_id ??\n  $json?.chat_id ??\n  null;\n\nconst token = $json.token;\n\nconst reply_text = `✅ Invite token (valid 7 days)\\nSend:\\n/start ${token}`;\n\nreturn [{\n  json: {\n    ...$json,\n    ok: true,\n    code: \"OK\",\n    chat_id,\n    output: {\n      ...( $json.output ?? {} ),\n      reply_text,\n    },\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        144
+      ],
+      "id": "daffbe1b-bc26-4894-8ffd-d52650346bc6",
+      "name": "Build reply"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select role\nfrom public.allowed_chats\nwhere chat_id = $1\n  and is_active = true\n  and (expires_at is null or expires_at > now())\nlimit 1;\n",
+        "options": {
+          "queryReplacement": "={{$json.meta.chat_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -480,
+        368
+      ],
+      "id": "8e53c426-0d43-489a-ab7e-64fc12c97c27",
+      "name": "Get Role",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -272,
+        272
+      ],
+      "id": "43b80383-c71a-4e7a-9c2e-313512cc3f8a",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Role",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF role is 'admin'": {
+      "main": [
+        [
+          {
+            "node": "Make token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return admin only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make token": {
+      "main": [
+        [
+          {
+            "node": "Insert invite",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Role": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "IF role is 'admin'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6589a084-cf24-4d54-8868-de766967f76d",
+  "meta": {
+    "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"
+  },
+  "id": "Zx7FmJi18s6P9mIg7JcjB",
+  "tags": []
+}

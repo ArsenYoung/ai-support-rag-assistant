@@ -1,0 +1,287 @@
+{
+  "name": "KB — Autotests",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -112
+      ],
+      "id": "c37a4a61-4c48-4232-9902-14cbb791df1f",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build test cases for KB — Answer v1\n// Output: array of items, each item is one test case.\n\nconst cases = [\n  // ----- ALLOW (should find sources in KB)\n  { name: \"ALLOW_whalentine_updates\", query: \"What are the key updates on $Whalentine?\", expect_mode: \"ALLOW\" },\n  { name: \"ALLOW_whitewhale_strength\", query: \"What does the relative strength in $WhiteWhale suggest?\", expect_mode: \"ALLOW\" },\n  { name: \"ALLOW_altcoins_downtrend_break\", query: \"Summarize the claim about altcoins breaking a 4.5-year downtrend vs Bitcoin.\", expect_mode: \"ALLOW\" },\n  { name: \"ALLOW_survival_alpha\", query: \"What does 'survival is the alpha' mean here?\", expect_mode: \"ALLOW\" },\n\n  // ----- CLARIFY (vague / missing entity)\n  { name: \"CLARIFY_vague_is_it_going_up\", query: \"Is it still going up?\", expect_mode: \"CLARIFY\" },\n  { name: \"CLARIFY_should_i_buy\", query: \"Should I buy this?\", expect_mode: \"CLARIFY\" },\n  { name: \"CLARIFY_tell_me_about_update\", query: \"Tell me about the update.\", expect_mode: \"CLARIFY\" },\n\n  // ----- NO_ANSWER (out of KB)\n  { name: \"NOANSWER_btc_price\", query: \"What’s the price of BTC right now?\", expect_mode: \"NO_ANSWER\" },\n  { name: \"NOANSWER_cpi_today\", query: \"Summarize today’s CPI report.\", expect_mode: \"NO_ANSWER\" },\n  { name: \"NOANSWER_uniswap_v4_hooks\", query: \"Explain how Uniswap v4 hooks work in detail.\", expect_mode: \"NO_ANSWER\" },\n];\n\nconst run_id = `run_${new Date().toISOString().replace(/[:.]/g, \"-\")}`;\n\nreturn cases.map((t, i) => ({\n  json: {\n    run_id,\n    idx: i + 1,\n    ...t,\n  },\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        -112
+      ],
+      "id": "a7909e2e-a0ab-482b-9e0c-df6317f4fb89",
+      "name": "Build test cases"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://arseniiostroumov.app.n8n.cloud/webhook/kb/answer",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "={{$vars.ANSWER_WEBHOOK_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": 123,\n  \"user_id\": 456,\n  \"user_text\": \"={{$json.query}}\",\n  \"kb_ref\": \"ceo_x_demo\",\n  \"silent\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1008,
+        48
+      ],
+      "id": "0e109bde-67e3-49de-8e3e-982b05386813",
+      "name": "HTTP Request → call KB — Answer v1 webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Assert result from KB — Answer v1 (works with wrapper shape)\n// Expected input shape (from your AFTER HTTP attach):\n// {\n//   test_case: { run_id, idx, name, query, expect_mode, ... },\n//   user_text, kb_ref, silent,\n//   _resp: { ...actual KB response... }\n// }\n\nfunction isObj(x) {\n  return x !== null && typeof x === \"object\" && !Array.isArray(x);\n}\n\nfunction pick(obj, paths) {\n  for (const p of paths) {\n    const parts = p.split(\".\");\n    let cur = obj;\n    let ok = true;\n    for (const k of parts) {\n      if (cur && Object.prototype.hasOwnProperty.call(cur, k)) cur = cur[k];\n      else { ok = false; break; }\n    }\n    if (ok && cur !== undefined) return cur;\n  }\n  return undefined;\n}\n\nfunction asArray(x) {\n  if (Array.isArray(x)) return x;\n  if (x === null || x === undefined) return [];\n  return [x];\n}\n\nfunction normalizeText(x) {\n  if (x === null || x === undefined) return \"\";\n  return String(x);\n}\n\nfunction tryParseJsonString(x) {\n  if (typeof x !== \"string\") return null;\n  const s = x.trim();\n  if (!s) return null;\n  try { return JSON.parse(s); } catch { return null; }\n}\n\nfunction normalizeMode(m) {\n  const x = String(m ?? \"\").trim().toUpperCase();\n  if (x === \"ANSWER\") return \"ALLOW\";\n  if (x === \"ALLOW\") return \"ALLOW\";\n  if (x === \"CLARIFY\") return \"CLARIFY\";\n  if (x === \"NO_ANSWER\" || x === \"NOANSWER\" || x === \"NO-ANSWER\") return \"NO_ANSWER\";\n  return \"\";\n}\n\n// ---------- input ----------\nconst j = $json;\n\n// test case is nested\nconst tc = isObj(j.test_case) ? j.test_case : (isObj(j.test) ? j.test : j);\n\n// response is nested under _resp (your attach node)\nlet resp = j._resp ?? j.kb_response ?? j.response ?? j.body ?? null;\n\n// if _resp is string JSON — parse\nconst parsedResp = tryParseJsonString(resp);\nif (parsedResp) resp = parsedResp;\n\nconst respIsObject = isObj(resp);\n\n// ---------- extract core fields ----------\nconst expect = tc.expect_mode ?? tc.expect ?? j.expect_mode ?? null;\n\n// gate mode could be in many places inside resp\nconst gate_mode_raw = pick(resp, [\n  \"gate_mode\",\n  \"mode\",\n  \"decision.mode\",\n  \"decision.gate_mode\",\n  \"output.mode\",\n  \"meta.gate_mode\",\n]);\n\nconst gate_mode = normalizeMode(gate_mode_raw);\n\n// reply text\nconst reply_text = normalizeText(\n  pick(resp, [\n    \"reply_text\",\n    \"reply\",\n    \"text\",\n    \"message\",\n    \"answer\",\n    \"output.reply_text\",\n    \"output.final_reply\",\n    \"output.reply\",\n    \"output.answer_text\",\n    \"output.answer\",\n  ])\n);\n\n// sources\nlet sources =\n  pick(resp, [\n    \"sources\",\n    \"citations\",\n    \"evidence\",\n    \"output.sources\",\n    \"output.citations\",\n    \"output.picked_hits\",\n    \"picked_hits\",\n    \"kb_sources\",\n    \"retrieval_rows\",\n    \"retrieval.hits\",\n  ]);\n\nsources = asArray(sources).flat();\n\nif (typeof sources === \"string\") {\n  const p = tryParseJsonString(sources);\n  sources = Array.isArray(p) ? p : [];\n}\nif (!Array.isArray(sources)) sources = [];\n\n// distances (debug)\nconst top_distance_num = pick(resp, [\n  \"top_distance_num\",\n  \"_d\",\n  \"retrieval.top_distance_num\",\n  \"decision.top_distance_num\",\n  \"meta.top_distance_num\",\n]);\n\nconst distance_stats = pick(resp, [\n  \"distance_stats\",\n  \"retrieval.distance_stats\",\n  \"meta.distance_stats\",\n]);\n\n// ---------- checks ----------\nconst checks = [];\nlet pass = true;\n\nconst expectNorm = normalizeMode(expect);\n\nconst expectOk = !!expectNorm;\nchecks.push({ check: \"expect_mode exists\", ok: expectOk, got: expect });\nif (!expectOk) pass = false;\n\nconst gateOk = expectOk && gate_mode === expectNorm;\nchecks.push({ check: \"gate_mode === expect_mode\", ok: gateOk, got: gate_mode_raw ?? gate_mode, expect });\nif (!gateOk) pass = false;\n\n// CLARIFY format: 1–2 questions \"1)\" / \"2)\" and no \"3)\"\nif (expectNorm === \"CLARIFY\") {\n  const lines = reply_text.split(\"\\n\").map(s => s.trim()).filter(Boolean);\n  const has1 = lines.some(l => /^1\\)/.test(l));\n  const has3 = lines.some(l => /^3\\)/.test(l));\n  const clarifyOk = has1 && !has3;\n  checks.push({ check: \"CLARIFY has 1–2 questions (no 3rd)\", ok: clarifyOk, sample_lines: lines.slice(0, 6) });\n  if (!clarifyOk) pass = false;\n}\n\n// NO_ANSWER: contains can't/cannot answer + no sources\nif (expectNorm === \"NO_ANSWER\") {\n  const t = reply_text.toLowerCase();\n  const hasCant = t.includes(\"can't answer\") || t.includes(\"cannot answer\") || t.includes(\"cant answer\");\n  const noSources = sources.length === 0;\n  checks.push({ check: \"NO_ANSWER contains can't/cannot answer\", ok: hasCant });\n  checks.push({ check: \"NO_ANSWER has no sources/citations\", ok: noSources, sources_count: sources.length });\n  if (!hasCant || !noSources) pass = false;\n}\n\n// ALLOW: 1–3 sources + each has source_url/url\nif (expectNorm === \"ALLOW\") {\n  const countOk = sources.length >= 1 && sources.length <= 3;\n  const eachHasUrl = sources.every(s => {\n    if (!s || typeof s !== \"object\") return false;\n    const url = s.source_url ?? s.url ?? s.sourceUrl ?? s.source;\n    return typeof url === \"string\" && url.startsWith(\"http\");\n  });\n  checks.push({ check: \"ALLOW has 1–3 sources\", ok: countOk, sources_count: sources.length });\n  checks.push({ check: \"ALLOW each source has source_url/url\", ok: eachHasUrl, sample: sources.slice(0, 2) });\n  if (!countOk || !eachHasUrl) pass = false;\n}\n\n// ---------- output ----------\nconst out = {\n  run_id: tc.run_id ?? j.run_id,\n  idx: tc.idx ?? j.idx,\n  name: tc.name ?? j.name,\n  query: tc.query ?? j.query,\n  expect_mode: expect,\n  got_gate_mode: gate_mode || gate_mode_raw || null,\n  pass,\n  reply_preview: reply_text.slice(0, 240),\n  sources_count: sources.length,\n  top_distance_num: top_distance_num ?? null,\n  distance_stats: distance_stats ?? null,\n  checks,\n  _debug: {\n    wrapper_keys: Object.keys(j || {}).slice(0, 40),\n    tc_keys: isObj(tc) ? Object.keys(tc).slice(0, 40) : [],\n    resp_is_object: respIsObject,\n    resp_type: typeof resp,\n    resp_keys: respIsObject ? Object.keys(resp).slice(0, 40) : [],\n    has__resp: Object.prototype.hasOwnProperty.call(j || {}, \"_resp\"),\n  },\n};\n\nreturn [{ json: out }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        48
+      ],
+      "id": "27941d42-8606-4622-b597-b057582ea9c0",
+      "name": "Assert result"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "f34f1065-ce5a-4a14-8ee4-b606bc3c4d22",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tests = $input.all().map(i => i.json);\n\n// Если run_id нет (у тебя сейчас теряется), можно взять из первого, иначе сгенерить\nconst run_id =\n  tests.find(t => t.run_id)?.run_id ??\n  `run_${Date.now()}`;\n\nreturn [{\n  json: {\n    ok: true,\n    run_id,\n    total: tests.length,\n    passed: tests.filter(t => t.pass).length,\n    failed: tests.filter(t => !t.pass).length,\n    tests, // <-- вот здесь весь массив результатов\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        -96
+      ],
+      "id": "e4e51651-82e5-474e-a664-387018716171",
+      "name": "Pack results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "f63a230f-3b9b-4e84-a39d-f0c55bdd8888",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const t = $json;\nreturn [{\n  json: {\n    test_case: t,\n    // удобное поле для body\n    user_text: t.query,\n    kb_ref: \"ceo_x_demo\",\n    silent: true,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        -48
+      ],
+      "id": "38afb34d-049c-491b-a9a5-a9b37ce94997",
+      "name": "BEFORE HTTP (Wrap test case)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Suppose HTTP node output JSON is the response itself in $json\n// and original test_case is still present as $json.test_case (because we wrapped it)\nconst tc = $json.test_case ?? {};\nconst resp = $json; // or $json.body if full response enabled\n\nreturn [{\n  json: {\n    ...tc,\n    _resp: resp\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        48
+      ],
+      "id": "285be396-279e-40e7-954d-bda7253e72e9",
+      "name": "AFTER HTTP (Attach response)"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1424,
+        -16
+      ],
+      "id": "9a54937e-c330-4b55-b2e0-86f49207d38a",
+      "name": "Merge1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Build test cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build test cases": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request → call KB — Answer v1 webhook": {
+      "main": [
+        [
+          {
+            "node": "AFTER HTTP (Attach response)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assert result": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "BEFORE HTTP (Wrap test case)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request → call KB — Answer v1 webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pack results": {
+      "main": [
+        []
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Pack results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BEFORE HTTP (Wrap test case)": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AFTER HTTP (Attach response)": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Assert result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "fa6e7142-3605-45a1-b321-b944474d4619",
+  "meta": {
+    "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"
+  },
+  "id": "BSMJmzzYPYiklcl0fsqDz",
+  "tags": []
+}

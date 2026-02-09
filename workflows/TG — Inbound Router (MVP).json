@@ -1,0 +1,1185 @@
+{
+  "name": "TG — Inbound Router (MVP)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -800,
+        272
+      ],
+      "id": "4fa93041-4390-4740-ba46-f54a203a9bab",
+      "name": "TG — Inbound (Trigger)",
+      "webhookId": "16a13775-0cc3-4892-9837-4a6da2981b42",
+      "credentials": {
+        "telegramApi": {
+          "id": "0OsuU6wfbas4R3nh",
+          "name": "RAGAssistantBot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function uuidv4() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    const v = c === 'x' ? r : (r & 0x3 | 0x8);\n    return v.toString(16);\n  });\n}\n\nfunction safeStr(v) {\n  return (v === null || v === undefined) ? \"\" : String(v);\n}\n\ntry {\n  const trace_id = uuidv4();\n  const t0 = Date.now();\n\n  const msg = $json?.message ?? {};\n  const chat_id = msg?.chat?.id ?? null;\n  const user_id = msg?.from?.id ?? \"unknown\";\n  const text = msg?.text ?? \"\";\n\n  return [{\n    json: {\n      meta: {\n        request_id: trace_id,\n        ts: new Date().toISOString(),\n        channel: \"telegram\",\n        chat_id: chat_id ? Number(chat_id) : null\n      },\n      input: {\n        user_id: safeStr(user_id),\n        question: safeStr(text).trim()\n      },\n      telegram: $json,\n      retrieval: { top_k: 5, hits: [], top_score: null },\n      decision: { mode: \"ALLOW\", reason: \"day1_stub\" },\n      output: { answer: \"\", sources: [] },\n      error: null,\n      timers: { t_start_ms: t0 }\n    }\n  }];\n} catch (e) {\n  const trace_id = uuidv4();\n  return [{\n    json: {\n      meta: {\n        request_id: trace_id,\n        ts: new Date().toISOString(),\n        channel: \"telegram\",\n        prompt_version: \"v1\",\n        chat_model: \"day1_stub\",\n        embedding_model: \"n/a\",\n        chat_id: null\n      },\n      input: { user_id: \"unknown\", question: \"\" },\n      telegram: $json,\n      retrieval: { top_k: 0, hits: [], top_score: null },\n      decision: { mode: \"DENY\", reason: \"build_envelope_error\" },\n      output: { answer: `⚠️ Sorry — something went wrong. Trace ID: ${trace_id}`, sources: [] },\n      error: {\n        message: e?.message || \"build_envelope_error\",\n        node: \"Build Envelope\",\n        stack: e?.stack || null\n      },\n      timers: { t_start_ms: Date.now() }\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        272
+      ],
+      "id": "e71616e2-fbb4-4b6f-bfd0-7cda31b0d67f",
+      "name": "Envelope — Build v1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.output.reply_text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2256,
+        272
+      ],
+      "id": "3fdb101c-4837-4d17-bf85-d10f4a925bdb",
+      "name": "TG — Send Reply",
+      "webhookId": "4470afdf-cbdd-4831-9467-6f55459e53a9",
+      "alwaysOutputData": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "0OsuU6wfbas4R3nh",
+          "name": "RAGAssistantBot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "8ZH9DHPDAa0BlO382T7KD",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/8ZH9DHPDAa0BlO382T7KD",
+          "cachedResultName": "KB — Answer v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        832,
+        816
+      ],
+      "id": "f2c9d18f-7043-475a-bae7-d16be81e05d3",
+      "name": "Call 'KB — Answer v1'"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json || {};\n\n  const helpText =\n`Hi! I'm your Knowledge Base Assistant.\n\nI answer strictly based on the knowledge base.\nIf there isn't enough context, I'll ask for clarification or say I don't know.\n\nCommands:\n/sources - list available KB documents\n/debug - show routing details (top_score, mode, top sources)\n/help - show this message\n\nAsk your question in plain text.`;\n\n  return {\n    json: {\n      ...j,\n\n      // ❗ retrieval НЕ трогаем для команд\n      retrieval: j.retrieval ?? null,\n\n      error: j.error ?? null,\n\n      decision: {\n        ...(j.decision || {}),\n        mode: \"COMMAND\",\n        reason: \"help\"\n      },\n\n      output: {\n        ...(j.output || {}),\n        answer: helpText,\n        sources: []\n      }\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -240
+      ],
+      "id": "e4ee867e-d801-4e15-bd11-f89efaeac16d",
+      "name": "Cmd — Help (Build Reply)"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  regexp_replace(trim(lower(kb_ref)), '[-\\s]+', '_', 'g') as source,\n  count(*) as chunks\nfrom public.kb_chunks\ngroup by 1\norder by chunks desc\nlimit 30;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        304
+      ],
+      "id": "30a243a9-6929-4793-8ef1-bbc309b6af6c",
+      "name": "DB — List sources",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Cmd — Sources (Build Reply)\n\n// 1) База — текущий инпут (он уже содержит meta/chat_id и т.д.)\nconst base = $json ?? {};\n\n// 2) Rows из БД: если нода стоит после SQL, то items = строки.\n// Но если перед ней был Merge, иногда rows лежат в другом поле.\n// Делаем максимально безопасно:\nconst rows = (Array.isArray(items) ? items : [])\n  .map(i => i?.json)\n  .filter(Boolean);\n\n// 3) Формируем список\nconst list = rows.slice(0, 30).map((r, idx) => {\n  const name =\n    r.source ??\n    r.kb_ref ??\n    r.doc ??\n    r.source_url ??\n    'unknown';\n\n  const chunks = r.chunks ?? r.chunk_ids ?? r.chunk_count ?? '';\n  const suffix = chunks ? ` (${chunks})` : '';\n  return `${idx + 1}) ${name}${suffix}`;\n});\n\n// 4) Текст ответа\nconst reply_text =\n  list.length\n    ? `Sources:\\n${list.join('\\n')}`\n    : 'No sources yet.';\n\n// 5) ВАЖНО: n8n ждёт { json: ... }\nreturn [{\n  json: {\n    ...base,\n    output: {\n      ...(base.output ?? {}),\n      reply_text,\n    },\n    chat_id:\n      base.chat_id ??\n      base.meta?.chat_id ??\n      base.telegram?.message?.chat?.id ??\n      null,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        304
+      ],
+      "id": "78eb6535-2844-47e9-92ae-d442fe2fd1b0",
+      "name": "Cmd — Sources (Build Reply)"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "XXwuLb0C-Qp03oDfC2JlC",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/XXwuLb0C-Qp03oDfC2JlC",
+          "cachedResultName": "Ops — Log chat_turn"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2256,
+        432
+      ],
+      "id": "1e3eee46-84bd-46ae-a5d4-dabab06db658",
+      "name": "Call 'Ops — Log chat_turn'"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json ?? {};\n\nfunction genId() {\n  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();\n  return `rid_${Date.now()}_${Math.random().toString(16).slice(2)}`;\n}\n\nfunction isObj(x) {\n  return x !== null && typeof x === \"object\" && !Array.isArray(x);\n}\n\nconst meta = isObj(j.meta) ? j.meta : {};\nconst request_id = meta.request_id ?? j.request_id ?? genId();\nconst trace_id = j.trace_id ?? meta.trace_id ?? meta.request_id ?? request_id;\n\nconst telegram = isObj(j.telegram) ? j.telegram : {};\nconst input = isObj(j.input) ? j.input : {};\nconst output = isObj(j.output) ? j.output : {};\n\n// Telegram message/callback extraction\nconst tgMsg =\n  telegram.message ??\n  telegram.callback_query?.message ??\n  {}; // may be {}\n\nconst tgFrom =\n  telegram.message?.from ??\n  telegram.callback_query?.from ??\n  null;\n\n// IDs (cover all known shapes)\nconst chat_id =\n  j.chat_id ??\n  j.tg_chat_id ??\n  input.chat_id ??\n  input.tg_chat_id ??\n  telegram.chat?.id ??\n  telegram.message?.chat?.id ??\n  telegram.callback_query?.message?.chat?.id ??\n  tgMsg.chat?.id ??\n  null;\n\nconst user_id =\n  j.user_id ??\n  j.tg_user_id ??\n  input.user_id ??\n  input.tg_user_id ??\n  telegram.from?.id ??\n  telegram.message?.from?.id ??\n  telegram.callback_query?.from?.id ??\n  tgFrom?.id ??\n  null;\n\n// Question / Reply text (always strings)\nconst questionRaw =\n  input.question ??\n  input.text ??\n  j.question ??\n  j.text ??\n  tgMsg.text ??\n  telegram.callback_query?.data ??\n  \"\";\n\nconst replyTextRaw =\n  output.reply_text ??\n  output.reply ??\n  j.reply_text ??\n  j.reply ??\n  j.answer ??\n  output.answer ??\n  \"\";\n\nconst question = String(questionRaw ?? \"\");\nconst reply_text = String(replyTextRaw ?? \"\");\n\nreturn [{\n  json: {\n    trace_id,\n    chat_id: chat_id == null ? null : String(chat_id),\n    user_id: user_id == null ? null : String(user_id),\n\n    meta: { ...meta, request_id },\n\n    input: { ...input, question },\n    telegram,\n\n    decision: j.decision ?? null,\n    output: { ...output, reply_text },\n\n    retrieval: j.retrieval ?? null,\n    timers: j.timers ?? null,\n    error: j.error ?? null,\n\n    channel: j.channel ?? meta.channel ?? \"unknown\",\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2064,
+        272
+      ],
+      "id": "44520436-3f1b-4eef-b6b9-564e7be5741b",
+      "name": "Envelope — Ensure v1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node: Build reply for /debug (last turn)\n\nconst r = $json || {};\n\n// ts может называться created_at (timestamptz)\nconst t = r.created_at ?? r.ts ?? \"-\";\nconst trace = r.trace_id ?? \"-\";\n\nconst q = r.question ?? \"-\";\nconst a = r.answer ?? \"-\";\n\nconst fallbackType = r.fallback_type ?? \"-\";\nconst topScore = r.top_score ?? '-';\nconst latencyMs = r.latency_ms ?? '-';\nconst promptVersion = r.prompt_version ?? '-';\nconst model = r.model ?? '-';\n\n// (опционально) sources_json красиво показать\nlet sourcesLine = \"\";\ntry {\n  const sj = r.sources_json;\n  if (sj && typeof sj === \"object\") {\n    // пример: если у тебя там hits или sources — подстрой под свой формат\n    // сейчас просто покажем kb_ref если он там есть\n    const kbRef =\n      sj?.kb_ref ??\n      sj?.retrieval?.kb_ref ??\n      sj?.decision?.kb_ref ??\n      null;\n    if (kbRef) sourcesLine = `\\nkb_ref: ${kbRef}`;\n  }\n} catch {}\n\nconst reply =\n`DEBUG (last turn)\n\nt: ${t}\ntrace: ${trace}\n\nq: ${q}\n\na: ${a}\n\nfallback_type: ${fallbackType}\ntop_score: ${topScore}\nlatency_ms: ${latencyMs}\nprompt_version: ${promptVersion}\nmodel: ${model}${sourcesLine}`;\n\nreturn [{\n  json: {\n    ...r,\n    output: {\n      ...(r.output ?? {}),\n      reply_text: reply,\n    },\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        544
+      ],
+      "id": "9dbac388-8c02-4921-a994-018ce897901a",
+      "name": "Build Debug Reply"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json ?? {};\nconst chat_id = Number(j.telegram?.message?.chat?.id ?? j.meta?.chat_id ?? j.chat_id ?? 0);\n\n// только твой приватный чат для демо (замени/добавь нужные id)\nconst DEMO_CHAT_IDS = new Set([168487641]);\n\nconst forced = DEMO_CHAT_IDS.has(chat_id) ? \"ceo_x_demo\" : null;\nconst kb_ref = forced ?? (j.kb_ref ?? j.meta?.kb_ref ?? null);\n\nreturn [{\n  json: {\n    ...j,\n    kb_ref,\n    meta: {\n      ...(j.meta ?? {}),\n      kb_ref,\n      chat_id: Number.isFinite(chat_id) ? chat_id : (j.meta?.chat_id ?? null),\n    },\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        816
+      ],
+      "id": "fb65251b-d22d-4862-9985-f91c0a77cce1",
+      "name": "Force kb_ref for demo chat"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        528
+      ],
+      "id": "0af01d46-216c-48eb-9377-f74e332ec8b3",
+      "name": "Pass-through"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        896,
+        544
+      ],
+      "id": "9552f066-8d6d-4b19-9b60-4c241fdad3f2",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a6cb88c5-807e-4f67-a861-4faae50c1db5",
+                    "leftValue": "={{$json.input.question}}",
+                    "rightValue": "^\\/start($|\\s|@)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/start"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "90571bae-27f3-42b0-a20b-f3fca6b2f33c",
+                    "leftValue": "={{$json.input.question}}",
+                    "rightValue": "^\\/invite($|\\s|@)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/invite"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.input.question}}",
+                    "rightValue": "^\\/help($|\\s|@)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    },
+                    "id": "96d741ec-9d27-446c-989e-c147641fcef4"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/help"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "985a0084-5c42-4a51-b3bf-1a0208dd768b",
+                    "leftValue": "={{$json.input.question}}",
+                    "rightValue": "^\\/sources($|\\s|@)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/sources"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "16b8cd8b-a553-487b-906e-106c8ba31816",
+                    "leftValue": "={{$json.input.question}}",
+                    "rightValue": "^\\/debug($|\\s|@)",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/debug"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cff3adc9-fad3-43fe-8b55-cd33eb8985eb",
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Default"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -384,
+        240
+      ],
+      "id": "013939e7-1481-4634-b475-643b7ee40d88",
+      "name": "Command Router"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ejV49H1_M06MR8cO4yybT",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ejV49H1_M06MR8cO4yybT",
+          "cachedResultName": "SUB WF Start Redeem"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        48,
+        -1072
+      ],
+      "id": "4b2dac74-f819-4abc-97c0-11a70caf8072",
+      "name": "Call 'KB — Start Redeem'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Zx7FmJi18s6P9mIg7JcjB",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Zx7FmJi18s6P9mIg7JcjB",
+          "cachedResultName": "SUB WF Invite Create"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        80,
+        -880
+      ],
+      "id": "7cd1d56e-8015-447f-b2e2-d70d0963dda6",
+      "name": "Call 'SUB WF Invite Create'"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4533aabd-4928-4483-bdc3-236692416c7b",
+              "leftValue": "={{ !!$json.chat_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        384,
+        832
+      ],
+      "id": "4c1285fa-0071-4458-8de5-75cea7ed4f87",
+      "name": "IF “allowed?”"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  chat_id,\n  role,\n  expires_at,\n  is_active\nfrom public.allowed_chats\nwhere chat_id = $1\n  and is_active = true\n  and (expires_at is null or expires_at > now())\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{$json.meta.chat_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        848
+      ],
+      "id": "a9567d38-4151-4f6d-8430-594dbb555cf5",
+      "name": "Load whitelist",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.meta.chat_id }}",
+        "text": "🔒 Access by invite only",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        592,
+        1008
+      ],
+      "id": "becd395e-0256-4de0-b7d9-bb26b7bbe385",
+      "name": "🔒 Access by invite only",
+      "webhookId": "96831571-33a4-4848-a7e2-fd048c356c5c",
+      "credentials": {
+        "telegramApi": {
+          "id": "0OsuU6wfbas4R3nh",
+          "name": "RAGAssistantBot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        192,
+        832
+      ],
+      "id": "5431a734-c2cc-454e-b615-3e6098832cb4",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4533aabd-4928-4483-bdc3-236692416c7b",
+              "leftValue": "={{ !!$json.chat_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        336,
+        544
+      ],
+      "id": "ddfee2b0-c8a1-4377-a2f5-c56e0496f122",
+      "name": "IF “allowed?”1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  chat_id,\n  role,\n  expires_at,\n  is_active\nfrom public.allowed_chats\nwhere chat_id = $1\n  and is_active = true\n  and (expires_at is null or expires_at > now())\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{$json.meta.chat_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -48,
+        560
+      ],
+      "id": "1be1f2d3-8828-4b23-8dba-ea325315bf03",
+      "name": "Load whitelist1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        144,
+        544
+      ],
+      "id": "c7c9bf28-ebc3-4ba5-bbaa-d508d7e57273",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4533aabd-4928-4483-bdc3-236692416c7b",
+              "leftValue": "={{ !!$json.chat_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        288,
+        256
+      ],
+      "id": "4e56a3d6-5eb7-4e64-88b0-a5c3cf9f6b67",
+      "name": "IF “allowed?”2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  chat_id,\n  role,\n  expires_at,\n  is_active\nfrom public.allowed_chats\nwhere chat_id = $1\n  and is_active = true\n  and (expires_at is null or expires_at > now())\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{$json.meta.chat_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -48,
+        336
+      ],
+      "id": "76c41726-15a2-4999-90e5-8287591b4b21",
+      "name": "Load whitelist2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        96,
+        240
+      ],
+      "id": "655c5599-0047-4c42-a894-d2a6f3926ec0",
+      "name": "Merge3"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        736,
+        256
+      ],
+      "id": "026af82c-7a5b-4148-a882-cbf45104c15f",
+      "name": "Merge4"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  created_at, trace_id, question, answer,\n  fallback_type, top_score, latency_ms, prompt_version, model,\n  sources_json\nfrom public.chat_turns\nwhere user_id = $1\n  and question is not null\n  and question not in ('/debug','/sources','/help','/start','/invite','/digest','/demo')\norder by created_at desc\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{$json.input.user_id ?? $json.meta.chat_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        704,
+        624
+      ],
+      "id": "cfcd4888-de8e-46fe-810c-492edd054be9",
+      "name": "PG — Debug last turns",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Cmd — Help (Build Reply)": [
+      {
+        "json": {
+          "meta": {
+            "request_id": "e200a1a3-c262-433d-927a-21bde7a1ada2",
+            "ts": "2025-12-18T17:57:44.841Z",
+            "channel": "telegram",
+            "prompt_version": "v1",
+            "chat_model": "day1_stub",
+            "embedding_model": "n/a",
+            "chat_id": 168487641
+          },
+          "input": {
+            "user_id": "168487641",
+            "question": "/help"
+          },
+          "telegram": {
+            "update_id": 15493821,
+            "message": {
+              "message_id": 164,
+              "from": {
+                "id": 168487641,
+                "is_bot": false,
+                "first_name": "Arseniy",
+                "last_name": "Ostroumov",
+                "username": "arseniy_ostroumov",
+                "language_code": "en"
+              },
+              "chat": {
+                "id": 168487641,
+                "first_name": "Arseniy",
+                "last_name": "Ostroumov",
+                "username": "arseniy_ostroumov",
+                "type": "private"
+              },
+              "date": 1766080665,
+              "text": "/help",
+              "entities": [
+                {
+                  "offset": 0,
+                  "length": 5,
+                  "type": "bot_command"
+                }
+              ]
+            }
+          },
+          "retrieval": {
+            "top_k": 5,
+            "hits": [],
+            "top_score": null
+          },
+          "decision": {
+            "mode": "COMMAND",
+            "reason": "help"
+          },
+          "output": {
+            "answer": "Hi! I'm your Knowledge Base Assistant.\n\nI answer strictly based on the knowledge base.\nIf there isn't enough context, I'll ask for clarification or say I don't know.\n\nCommands:\n/sources - list available KB documents\n/debug - show routing details (top_score, mode, top sources)\n/help - show this message\n\nAsk your question in plain text.",
+            "sources": []
+          },
+          "error": null,
+          "timers": {
+            "t_start_ms": 1766080664841
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "TG — Inbound (Trigger)": {
+      "main": [
+        [
+          {
+            "node": "Envelope — Build v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envelope — Build v1": {
+      "main": [
+        [
+          {
+            "node": "Command Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'KB — Answer v1'": {
+      "main": [
+        [
+          {
+            "node": "Envelope — Ensure v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cmd — Help (Build Reply)": {
+      "main": [
+        [
+          {
+            "node": "Envelope — Ensure v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB — List sources": {
+      "main": [
+        [
+          {
+            "node": "Merge4",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Cmd — Sources (Build Reply)": {
+      "main": [
+        [
+          {
+            "node": "Envelope — Ensure v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envelope — Ensure v1": {
+      "main": [
+        [
+          {
+            "node": "TG — Send Reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Call 'Ops — Log chat_turn'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Debug Reply": {
+      "main": [
+        [
+          {
+            "node": "Envelope — Ensure v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Force kb_ref for demo chat": {
+      "main": [
+        [
+          {
+            "node": "Call 'KB — Answer v1'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pass-through": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PG — Debug last turns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Build Debug Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Command Router": {
+      "main": [
+        [
+          {
+            "node": "Call 'KB — Start Redeem'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'SUB WF Invite Create'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cmd — Help (Build Reply)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Load whitelist2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Load whitelist1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Load whitelist",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'KB — Start Redeem'": {
+      "main": [
+        [
+          {
+            "node": "TG — Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'SUB WF Invite Create'": {
+      "main": [
+        [
+          {
+            "node": "TG — Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF “allowed?”": {
+      "main": [
+        [
+          {
+            "node": "Force kb_ref for demo chat",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔒 Access by invite only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load whitelist": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "IF “allowed?”",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load whitelist1": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "IF “allowed?”1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF “allowed?”1": {
+      "main": [
+        [
+          {
+            "node": "Pass-through",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔒 Access by invite only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load whitelist2": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge3": {
+      "main": [
+        [
+          {
+            "node": "IF “allowed?”2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF “allowed?”2": {
+      "main": [
+        [
+          {
+            "node": "DB — List sources",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔒 Access by invite only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge4": {
+      "main": [
+        [
+          {
+            "node": "Cmd — Sources (Build Reply)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG — Debug last turns": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "9725a634-414a-405f-b9ea-a03a7cbb8656",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"
+  },
+  "id": "j9cwDpwo-C-CYVoJO7EZA",
+  "tags": []
+}

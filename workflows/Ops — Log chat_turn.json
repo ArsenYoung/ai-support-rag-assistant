@@ -1,0 +1,196 @@
+{
+  "name": "Ops — Log chat_turn",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4ad7a7f9-6d62-44fd-9ab0-2a9b4db9edeb",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const env = $json ?? {};\n\nconst tgText =\n  env.telegram?.message?.text ??\n  env.telegram?.callback_query?.message?.text ??\n  env.telegram?.callback_query?.data ??\n  \"\";\n\nconst questionRaw =\n  env.input?.question ??\n  env.question ??\n  env.input?.text ??\n  tgText;\n\nconst answerRaw =\n  env.output?.reply_text ??\n  env.answer ??\n  env.output?.answer ??\n  \"\";\n\nconst trace_id = (env.trace_id ?? env.meta?.request_id ?? \"\").toString();\nconst user_id = (env.user_id ?? env.input?.user_id ?? env.telegram?.message?.from?.id ?? env.telegram?.callback_query?.from?.id ?? \"\").toString();\n\n// КЛЮЧЕВОЕ: никогда не null\nconst question = (questionRaw == null ? \"[missing]\" : String(questionRaw));\nconst answer = (answerRaw == null ? \"\" : String(answerRaw));\n\nreturn [{\n  json: {\n    trace_id,\n    user_id,\n    question,\n    answer,\n    top_score: env.retrieval?.top_score ?? env.top_score ?? null,\n    fallback_type: env.decision?.mode ?? env.fallback_type ?? null,\n    prompt_version: env.meta?.prompt_version ?? null,\n    model: env.meta?.model ?? null,\n    latency_ms: env.latency_ms ?? env.timers?.latency_ms ?? null,\n    sources_json: env.retrieval ? { retrieval: env.retrieval } : (env.sources_json ?? {}),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "4fdb947e-6ee4-4ca0-ae66-02cad69d2ed5",
+      "name": "Normalize — Build Log Record"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with p as (select $1::jsonb as j)\ninsert into public.chat_turns (\n  trace_id, user_id, question, answer,\n  top_score, fallback_type, prompt_version, model, latency_ms,\n  sources_json, created_at\n)\nselect\n  j->>'trace_id',\n  j->>'user_id',\n  coalesce(j->>'question','[missing]'),\n  coalesce(j->>'answer',''),\n  nullif(j->>'top_score','')::double precision,\n  nullif(j->>'fallback_type','')::text,\n  nullif(j->>'prompt_version','')::text,\n  nullif(j->>'model','')::text,\n  nullif(j->>'latency_ms','')::int,\n  j->'sources_json',\n  now()\nfrom p;\n",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        432,
+        0
+      ],
+      "id": "8d109d41-cad7-47ce-a795-a3b4fe04b4d1",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "meta": {
+            "request_id": "26534989-c883-44d4-bb21-c7b8a6d548a2",
+            "ts": "2025-12-19T07:51:54.237Z",
+            "channel": "telegram",
+            "prompt_version": "v1",
+            "chat_model": "day1_stub",
+            "embedding_model": "text-embedding-3-small",
+            "chat_id": 168487641
+          },
+          "input": {
+            "user_id": "168487641",
+            "question": "How do I request access?"
+          },
+          "telegram": {
+            "update_id": 15493835,
+            "message": {
+              "message_id": 191,
+              "from": {
+                "id": 168487641,
+                "is_bot": false,
+                "first_name": "Arseniy",
+                "last_name": "Ostroumov",
+                "username": "arseniy_ostroumov",
+                "language_code": "en"
+              },
+              "chat": {
+                "id": 168487641,
+                "first_name": "Arseniy",
+                "last_name": "Ostroumov",
+                "username": "arseniy_ostroumov",
+                "type": "private"
+              },
+              "date": 1766130713,
+              "text": "How do I request access?"
+            }
+          },
+          "decision": {
+            "mode": "ALLOW",
+            "reason": "llm_override_high_score"
+          },
+          "output": {
+            "answer": "To request access, submit a ticket with your email, role, and the system name. Access is granted within 1 business day.\n\nSources:\n1) Access request process — Onboarding\nhttps://example.com/access",
+            "sources": [
+              {
+                "n": 1,
+                "chunk_id": "demo-support__access-request-process__0",
+                "doc": "Access request process",
+                "section": "Onboarding",
+                "source_url": "https://example.com/access",
+                "score": 0.536654523289953
+              }
+            ],
+            "mode": "ALLOW",
+            "answer_text": "To request access, submit a ticket with your email, role, and the system name. Access is granted within 1 business day.",
+            "clarify": [],
+            "reply_text": "To request access, submit a ticket with your email, role, and the system name. Access is granted within 1 business day.\n\nSources:\n1) Access request process — Onboarding\nhttps://example.com/access"
+          },
+          "retrieval": {
+            "top_k": 5,
+            "hits": [
+              {
+                "n": 1,
+                "chunk_id": "demo-support__access-request-process__0",
+                "doc": "Access request process",
+                "section": "Onboarding",
+                "source_url": "https://example.com/access",
+                "score": 0.536654523289953,
+                "distance": 0.863396201096961
+              },
+              {
+                "n": 2,
+                "chunk_id": "demo-support__support-sla__0",
+                "doc": "Support SLA",
+                "section": "Response time",
+                "source_url": "https://example.com/sla",
+                "score": 0.451391778792987,
+                "distance": 1.21537043203131
+              },
+              {
+                "n": 3,
+                "chunk_id": "demo-support__cancellation-policy__0",
+                "doc": "Cancellation policy",
+                "section": "Refunds",
+                "source_url": "https://example.com/cancel",
+                "score": 0.43284176820088,
+                "distance": 1.31031308313089
+              }
+            ],
+            "top_score": 0.536654523289953,
+            "hits_count": 3
+          },
+          "timers": {
+            "t_start_ms": 1766130714237,
+            "t_after_embed_ms": 1766130716640
+          },
+          "error": null,
+          "channel": "telegram"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Normalize — Build Log Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize — Build Log Record": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0ffa4cb7-3957-435a-a1f9-c5b70da8ffb2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"
+  },
+  "id": "XXwuLb0C-Qp03oDfC2JlC",
+  "tags": []
+}

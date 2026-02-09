@@ -1,0 +1,1032 @@
+{
+  "name": "KB — Answer v1",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        160
+      ],
+      "id": "8efbc96f-d7d8-4cdb-a9ed-1a9cc94967b5",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json?.body ?? null;\nconst payload = (body && typeof body === \"object\") ? body : $json;\n\n// Promote webhook body fields to top-level\nconst merged = (body && typeof body === \"object\") ? { ...$json, ...body } : { ...$json };\n\n// -------------------- question --------------------\nconst qRaw =\n  payload?.input?.question ??\n  payload?.question ??\n  payload?.user_text ??               // FIX\n  merged?.user_text ??                // FIX (на всякий)\n  payload?.text ??\n  payload?.telegram?.message?.text ??\n  merged?.telegram?.message?.text ??\n  \"\";\n\nconst question = String(qRaw).replace(/^\\s*=\\s*/, \"\").trim(); // FIX: strip leading \"=\"\n\n// -------------------- kb_ref --------------------\nconst kbRefRaw =\n  payload?.meta?.kb_ref ??\n  payload?.kb_ref ??\n  merged?.meta?.kb_ref ??\n  merged?.kb_ref ??\n  null;\n\nfunction normKbRef(v) {\n  if (v === null || v === undefined) return null;\n  const s = String(v).trim();\n  if (!s) return null;\n  const low = s.toLowerCase();\n  if (low === \"null\" || low === \"undefined\") return null;\n  return s;\n}\n\nlet kb_ref = normKbRef(kbRefRaw);\nif (!kb_ref) kb_ref = \"ceo_x_demo\"; // optional default for demo\n\n// -------------------- retrieval --------------------\nconst retrievalIn =\n  (payload?.retrieval && typeof payload.retrieval === \"object\") ? payload.retrieval :\n  (merged?.retrieval && typeof merged.retrieval === \"object\") ? merged.retrieval :\n  {};\n\nconst topKRaw = retrievalIn?.top_k ?? retrievalIn?.topK ?? payload?.top_k ?? payload?.topK ?? null;\nconst top_k_num = topKRaw == null ? 5 : Number(topKRaw);\n\nconst retrieval = {\n  ...retrievalIn,\n  top_k: (Number.isFinite(top_k_num) && top_k_num > 0) ? top_k_num : 5,\n};\n\n// -------------------- chat_id / user_id --------------------\nconst chatIdRaw =\n  payload?.meta?.chat_id ??\n  payload?.chat_id ??\n  payload?.body?.chat_id ??\n  payload?.telegram?.message?.chat?.id ??\n  merged?.meta?.chat_id ??\n  merged?.chat_id ??\n  merged?.telegram?.message?.chat?.id ??\n  null;\n\nconst userIdRaw =\n  payload?.meta?.user_id ??\n  payload?.user_id ??\n  payload?.body?.user_id ??\n  payload?.telegram?.message?.from?.id ??\n  merged?.meta?.user_id ??\n  merged?.user_id ??\n  merged?.telegram?.message?.from?.id ??\n  null;\n\nconst chat_id = chatIdRaw == null ? null : Number(chatIdRaw);\nconst user_id = userIdRaw == null ? null : Number(userIdRaw);\n\n// -------------------- request_id --------------------\nconst request_id =\n  payload?.meta?.request_id ??\n  payload?.request_id ??\n  merged?.meta?.request_id ??\n  merged?.request_id ??\n  null;\n\n// -------------------- meta / input --------------------\nconst metaIn = (payload?.meta && typeof payload.meta === \"object\") ? payload.meta : (merged?.meta ?? {});\nconst inputIn = (payload?.input && typeof payload.input === \"object\") ? payload.input : (merged?.input ?? {});\n\nconst meta = {\n  ...metaIn,\n  kb_ref,\n};\n\nconst input = {\n  ...inputIn,\n  question: (inputIn?.question ?? question),\n};\n\nreturn [{\n  json: {\n    ...merged,\n    kb_ref,\n    retrieval,\n    meta,\n    input,\n    question,\n    chat_id: Number.isFinite(chat_id) ? chat_id : null,\n    user_id: Number.isFinite(user_id) ? user_id : null,\n    request_id,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        160
+      ],
+      "id": "94779a3a-7aad-4b8b-924e-ead74b7e881b",
+      "name": "KB — Input Normalize"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"text-embedding-3-small\",\n  \"input\": \"={{$json.question}}\"\n}\n",
+        "options": {
+          "timeout": 6000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        400,
+        160
+      ],
+      "id": "905a8cd7-f08c-4a25-8f14-094ed71ab08c",
+      "name": "OpenAI — Embeddings (HTTP)",
+      "credentials": {
+        "openAiApi": {
+          "id": "szpBWy88gJHBt0BR",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const idx = $itemIndex;\nconst env = $items(\"KB — Input Normalize\")?.[idx]?.json ?? {};\nconst emb = $json.data?.[0]?.embedding;\nif (!emb) throw new Error(\"No embedding in OpenAI response\");\n\nreturn {\n  json: {\n    ...env,\n    query_embedding: emb,\n    meta: {\n      ...(env.meta ?? {}),\n      embedding_model: $json.model ?? \"text-embedding-3-small\",\n    },\n    timers: {\n      ...(env.timers ?? {}),\n      t_after_embed_ms: Date.now(),\n    },\n  },\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        160
+      ],
+      "id": "de9f52f0-ef60-4eae-ad07-8d5c56a0d953",
+      "name": "KB — Extract Query Embedding"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select *\nfrom public.kb_match_cosine(\n  coalesce($1, 'demo_support'),\n  $2::vector,\n  coalesce($3::int, 5)\n);\n",
+        "options": {
+          "connectionTimeout": 6,
+          "queryReplacement": "={{$json.kb_ref}}, {{$json.query_embedding_vec}}, {{$json.retrieval.top_k}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        944,
+        160
+      ],
+      "id": "eb6e607e-06eb-447d-9403-50091b481446",
+      "name": "DB — Retrieve kb_chunks (topK)",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// KB — Build Context (preserve incoming fields)\n\n// 1) текущий item уже содержит gate_mode/top_distance_num/distance_stats/retrieval_rows и т.п.\nconst base = items?.[0]?.json ?? {};\n\n// 2) исходный envelope/контекст из ноды с эмбеддингом (если нужен)\nconst env = $node[\"KB — Extract Query Embedding\"]?.json ?? {};\n\n// 3) rows: предпочитаем retrieval_rows (если уже вложены), иначе собираем из items\nlet rows = [];\nif (Array.isArray(base.retrieval_rows) && base.retrieval_rows.length) {\n  rows = base.retrieval_rows.filter(r => r && r.content);\n} else {\n  rows = (items || []).map(i => i.json).filter(r => r && r.content);\n}\n\n// 4) сортировка по score desc\nrows.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));\n\nconst MAX_CHARS_PER_CHUNK = 1400;\n\nconst kb_sources = rows.map((r, idx) => ({\n  n: idx + 1,\n  chunk_id: r.chunk_id ?? null,\n  doc: r.doc ?? null,\n  section: r.section ?? null,\n  source_url: r.source_url ?? null,\n  score: r.score ?? null,\n  distance: r.distance ?? null,\n}));\n\nconst kb_context_text = rows.map((r, idx) => {\n  let content = String(r.content ?? \"\").trim();\n  if (content.length > MAX_CHARS_PER_CHUNK) content = content.slice(0, MAX_CHARS_PER_CHUNK) + \"…\";\n  const scoreStr = Number(r.score ?? 0).toFixed(3);\n  const distStr = r.distance == null ? \"\" : ` distance=${Number(r.distance).toFixed(3)}`;\n  return `[${idx + 1}] doc=\"${r.doc ?? \"\"}\" section=\"${r.section ?? \"\"}\" score=${scoreStr}${distStr}\\n${content}`;\n}).join(\"\\n\\n\");\n\nconst top_score = rows[0]?.score ?? null;\nconst top_distance = rows[0]?.distance ?? base.top_distance_num ?? null;\n\n// 5) МЕРДЖ: сохраняем base поля, добавляем env поля (если их нет), потом перезаписываем retrieval/kb_*\nconst merged = {\n  ...env,      // env как дефолты\n  ...base,     // base важнее (сохранить gate_mode/top_distance_num/...)\n  retrieval: {\n    ...(env.retrieval ?? {}),\n    ...(base.retrieval ?? {}),\n    hits_count: rows.length,\n    top_score,\n    top_distance,\n    hits: kb_sources,\n    compiled_context: kb_context_text,\n  },\n  kb_context_text,\n  kb_sources,\n};\n\nreturn [{ json: merged }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        -288
+      ],
+      "id": "3edddc70-708e-4d9c-8495-0e5b26ac50a9",
+      "name": "KB — Build Context"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json;\n\n  const picked = Array.isArray(j.output?.picked_hits) ? j.output.picked_hits : [];\n  const sources = picked\n    .map((h, i) => ({\n      n: h.n ?? (i + 1),\n      chunk_id: h.chunk_id ?? null,\n      doc: h.doc ?? \"\",\n      section: h.section ?? \"\",\n      source_url: h.source_url ?? null,\n      score: Number(h.score ?? 0)\n    }))\n    .sort((a, b) => b.score - a.score)\n    .slice(0, 5);\n\n  j.output = j.output ?? {};\n  j.output.sources = sources;\n\n  return { json: j };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4064,
+        -304
+      ],
+      "id": "0e8f4d11-a8df-46f8-beaf-9c1bf326312d",
+      "name": "KB — Build Sources"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json;\n\n  const mode = String(j.decision?.mode ?? \"NO_ANSWER\").toUpperCase();\n  const answerText = (j.output?.answer_text ?? \"\").trim();\n  const clarify = Array.isArray(j.output?.clarify) ? j.output.clarify : [];\n  const sources = Array.isArray(j.output?.sources) ? j.output.sources : [];\n\n  let text = \"\";\n\n  if (mode === \"ALLOW\") {\n    text = answerText || \"OK.\";\n\n    if (sources.length) {\n      const sourcesBlock =\n        \"\\n\\nSources:\\n\" +\n        sources.map((s, i) => {\n          const title = `${s.doc}${s.section ? \" — \" + s.section : \"\"}`;\n          const url = s.source_url ? `\\n${s.source_url}` : \"\";\n          return `${i + 1}) ${title}${url}`;\n        }).join(\"\\n\\n\");\n\n      text += sourcesBlock;\n    }\n  } else if (mode === \"CLARIFY\") {\n    const qs = clarify.length ? clarify : [\"Please уточни вопрос.\"];\n    text = \"I need a bit more info:\\n\" + qs.map(x => `- ${x}`).join(\"\\n\");\n  } else {\n    text = \"I couldn't find the answer in the Knowledge Base.\";\n  }\n\n  j.output = j.output ?? {};\n  j.output.reply_text = text;\n  j.output.answer = text; // backward-compat\n\n  return { json: j };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4272,
+        -304
+      ],
+      "id": "0337eb28-671b-49d9-a918-1628e2b01af5",
+      "name": "KB — Build Final Reply"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json;\n\n  delete j.query_embedding;\n\n  if (j.retrieval) {\n    delete j.retrieval.compiled_context;\n    if (Array.isArray(j.retrieval.hits)) {\n      j.retrieval.hits = j.retrieval.hits.map(h => {\n        const hh = { ...h };\n        delete hh.embedding;\n        delete hh.embedding_vector;\n        return hh;\n      });\n    }\n  }\n\n  if (j.llm) {\n    delete j.llm.raw_text;\n  }\n\n  if (j.output) {\n    delete j.output.picked_hits;\n  }\n\n  return { json: j };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4480,
+        -304
+      ],
+      "id": "608e83b4-4941-4503-b285-a72470e9dfeb",
+      "name": "KB — Strip Heavy Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json;\n\n  j.decision = j.decision ?? {};\n  j.output = j.output ?? {};\n\n  const mode = String(j.decision.mode ?? \"NO_ANSWER\").toUpperCase();\n\n  // Keep fallback responses citation-free (sources are attached only for ALLOW).\n  j.output.sources = [];\n\n  if (mode === \"CLARIFY\") {\n    if (!String(j.output.answer ?? \"\").trim()) {\n      j.output.answer =\n        \"I found partially relevant info in the knowledge base, but I need a bit more detail to answer.\\n\\n\" +\n        \"What to clarify:\\n\" +\n        \"- Which exact section/process are you referring to (function/page/step name)?\\n\" +\n        \"- Which system/integration is this about (if there are multiple)?\";\n    }\n  } else {\n    if (!String(j.output.answer ?? \"\").trim()) {\n      j.output.answer =\n        \"I couldn’t find an answer in the knowledge base for this question.\\n\\n\" +\n        \"What you can do:\\n\" +\n        \"- Rephrase the question\\n\" +\n        \"- Add 1–2 details (feature/section name, error code, step in the process)\";\n    }\n  }\n\n  return { json: j };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        160
+      ],
+      "id": "8a8ea21f-2fa4-40d2-be79-62ffc5def3f0",
+      "name": "Ops — Finalize Fallback"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json;\n\n  delete j.query_embedding;\n\n  // обычно при fallback контекст/источники тоже не нужны дальше\n  // (оставь, если хочешь видеть в логах)\n  // delete j.kb_context_text;\n  // delete j.kb_sources;\n\n  return { json: j };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2416,
+        160
+      ],
+      "id": "38d88f15-ffa6-4675-9913-91189be8ed40",
+      "name": "Ops — Strip Heavy Fields"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{ $json.prompt_text }}"
+            },
+            {
+              "content": "=Question:\n{{$json.input.question}}\n\nContext (KB chunks):\n{{$json.retrieval.compiled_context}}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        3264,
+        -192
+      ],
+      "id": "b164f4c7-c512-4d03-a2e5-df30b24117b2",
+      "name": "OpenAI — Answer v1",
+      "retryOnFail": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "szpBWy88gJHBt0BR",
+          "name": "OpenAi account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// KB — Parse Answer (safe, no node-name dependency)\n// Expects:\n// - $json contains OpenAI response object (Responses API shape) OR\n// - $json has { base: <gate/context object>, openai: <response> } OR\n// - $json has { ctx/base/gate: <...>, ...openaiResponseFields }\n//\n// Output: { ...base, decision.mode, output.answer_text/clarify/picked_hits, llm.raw_text/parsed }\n\nfunction stripCodeFences(s) {\n  return String(s ?? \"\")\n    .trim()\n    .replace(/^```(?:json)?\\s*/i, \"\")\n    .replace(/\\s*```$/i, \"\")\n    .trim();\n}\n\nfunction extractResponsesOutputText(resp) {\n  const out = resp?.output;\n  if (Array.isArray(out)) {\n    for (const item of out) {\n      if (item?.type === \"message\" && Array.isArray(item?.content)) {\n        for (const c of item.content) {\n          if (c?.type === \"output_text\" && typeof c?.text === \"string\" && c.text.trim()) {\n            return c.text.trim();\n          }\n        }\n      }\n    }\n  }\n  return \"\";\n}\n\nfunction extractChatCompletionsText(resp) {\n  const cc =\n    resp?.choices?.[0]?.message?.content ??\n    resp?.data?.choices?.[0]?.message?.content ??\n    resp?.message?.content;\n  if (typeof cc === \"string\" && cc.trim()) return cc.trim();\n  return \"\";\n}\n\nfunction extractResponseText(resp) {\n  const t = extractResponsesOutputText(resp);\n  if (t) return t;\n  const cc = extractChatCompletionsText(resp);\n  if (cc) return cc;\n  if (typeof resp === \"string\" && resp.trim()) return resp.trim();\n  return \"\";\n}\n\nfunction parseJsonLoose(raw) {\n  const s = stripCodeFences(raw);\n  try {\n    const p = JSON.parse(s);\n    if (typeof p === \"string\") return JSON.parse(stripCodeFences(p));\n    return p;\n  } catch {}\n  const m = s.match(/\\{[\\s\\S]*\\}/);\n  if (m) {\n    try { return JSON.parse(m[0]); } catch {}\n  }\n  return null;\n}\n\nfunction normalizeMode(m) {\n  const x = String(m ?? \"\").trim().toUpperCase();\n  if (x === \"ANSWER\") return \"ALLOW\";\n  if (x === \"ALLOW\") return \"ALLOW\";\n  if (x === \"CLARIFY\") return \"CLARIFY\";\n  if (x === \"NO_ANSWER\" || x === \"NOANSWER\" || x === \"NO-ANSWER\") return \"NO_ANSWER\";\n  return \"\";\n}\n\nfunction ensureArray(x) {\n  if (Array.isArray(x)) return x;\n  if (typeof x === \"string\" && x.trim()) return [x.trim()];\n  return [];\n}\n\nfunction extractModel(resp) {\n  const direct = [resp?.model, resp?.data?.model, resp?.info?.model, resp?.metadata?.model];\n  for (const m of direct) if (typeof m === \"string\" && m.trim()) return m.trim();\n  return \"\";\n}\n\nfunction pickHits({ parsed, answerText, hits }) {\n  // Minimal: keep top 1-3 hits by score, or match explicit sources if present\n  const byN = new Map();\n  const byId = new Map();\n  hits.forEach((h, idx) => {\n    byN.set(idx + 1, { ...h, n: idx + 1 });\n    if (h?.chunk_id) byId.set(String(h.chunk_id), { ...h, n: idx + 1 });\n  });\n\n  const explicit = parsed?.sources;\n  if (Array.isArray(explicit) && explicit.length) {\n    const picked = [];\n    for (const x of explicit) {\n      if (typeof x === \"number\" || /^\\d+$/.test(String(x))) {\n        const h = byN.get(Number(x));\n        if (h) picked.push(h);\n      } else {\n        const h = byId.get(String(x));\n        if (h) picked.push(h);\n      }\n    }\n    if (picked.length) return picked.slice(0, 3);\n  }\n\n  // Fallback: take best scored 1-3\n  const sorted = [...hits].sort((a,b) => Number(b?.score ?? 0) - Number(a?.score ?? 0));\n  return sorted.slice(0, 3);\n}\n\n// ====== main: locate base + openai response safely ======\nconst j = $json;\n\n// Heuristics: base/context object is usually the one that contains retrieval/decision/kb_ref etc.\nconst base =\n  j.base ??\n  j.ctx ??\n  j.context ??\n  j.gate ??\n  j.payload ??\n  (j.retrieval || j.decision || j.kb_ref ? j : null) ??\n  {};\n\n// OpenAI response object (Responses API) might be $json itself or under openai/response/body/result\nconst resp =\n  j.openai ??\n  j.response ??\n  j.body ??\n  j.result ??\n  (j.object === \"response\" && j.output ? j : null) ??\n  j;\n\n// Extract model output text + parse JSON\nconst raw = extractResponseText(resp);\nconst parsed = parseJsonLoose(raw);\n\n// Gate mode from retrieval layer (your MUST)\nconst gateMode = String(base?.gate_mode ?? base?.decision?.mode ?? \"ALLOW\").toUpperCase();\n\n// LLM mode (optional) — but we will NOT let it override gate unless you want\nlet llmMode = normalizeMode(parsed?.mode);\nif (!llmMode) llmMode = \"CLARIFY\";\n\nlet finalMode = gateMode;\nlet finalReason = base?.decision?.reason ?? \"ok\";\n\nlet answerText = \"\";\nlet clarify = [];\n\n// If gate is ALLOW, we use LLM answer/clarify/no_answer content\nif (gateMode === \"ALLOW\") {\n  if (llmMode === \"ALLOW\") {\n    answerText = String(parsed?.answer ?? \"\").trim();\n  } else if (llmMode === \"CLARIFY\") {\n    clarify = ensureArray(parsed?.clarify);\n    finalMode = \"CLARIFY\";\n    finalReason = \"llm_clarify\";\n  } else if (llmMode === \"NO_ANSWER\") {\n    finalMode = \"NO_ANSWER\";\n    finalReason = \"llm_no_answer\";\n  }\n\n  // Safe fallbacks\n  if (finalMode === \"ALLOW\" && !answerText) {\n    finalMode = \"CLARIFY\";\n    finalReason = \"llm_empty_answer\";\n    clarify = [\"1) What exactly should I answer about this?\", \"2) Please quote the relevant line if possible.\"];\n  }\n  if (finalMode === \"CLARIFY\" && (!clarify || !clarify.length)) {\n    clarify = [\"1) What exactly should I answer about this?\", \"2) Please quote the relevant line if possible.\"];\n  }\n}\n\n// Sources only for ALLOW\nconst hits = base?.retrieval_rows ?? base?.kb_sources ?? base?.retrieval?.hits ?? [];\nconst picked_hits = finalMode === \"ALLOW\" ? pickHits({ parsed, answerText, hits }) : [];\n\nconst detectedModel = extractModel(resp);\n\n// Return merged object\nreturn [{\n  json: {\n    ...base,\n    decision: {\n      ...(base.decision ?? {}),\n      mode: finalMode,\n      reason: finalReason,\n    },\n    output: {\n      ...(base.output ?? {}),\n      mode: finalMode,\n      answer_text: finalMode === \"ALLOW\" ? answerText : \"\",\n      clarify: finalMode === \"CLARIFY\" ? clarify : [],\n      picked_hits,\n    },\n    llm: {\n      raw_text: raw,\n      parsed: parsed ?? null,\n      model: detectedModel || null,\n    },\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3856,
+        -304
+      ],
+      "id": "83ee8a36-92bc-4d9d-b087-d58e827098ff",
+      "name": "KB — Parse Answer"
+    },
+    {
+      "parameters": {
+        "url": "https://raw.githubusercontent.com/ArsenYoung/ai-support-rag-assistant/main/prompts/answer.md",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2288,
+        -112
+      ],
+      "id": "0c03bbd8-4cd1-44a2-9b34-182195c58e84",
+      "name": "Prompt — Load answer.md"
+    },
+    {
+      "parameters": {
+        "jsCode": "function fnv1a32(str) {\n  let h = 0x811c9dc5;\n  for (let i = 0; i < str.length; i++) {\n    h ^= str.charCodeAt(i);\n    h = Math.imul(h, 0x01000193);\n  }\n  return (\"00000000\" + (h >>> 0).toString(16)).slice(-8);\n}\n\nconst prompt_text = ($json.body ?? $json.data ?? $json.prompt ?? \"\").toString();\nif (!prompt_text.trim()) {\n  throw new Error(\"PROMPT_LOAD_ERROR: empty prompt_text\");\n}\n\nreturn [{\n  json: {\n    ...$json,\n    prompt_text,\n    meta: {\n      ...( $json.meta || {} ),\n      prompt_version: \"v1\",\n      prompt_hash: \"fnv1a32:\" + fnv1a32(prompt_text),\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        -112
+      ],
+      "id": "de9ec159-862a-4377-9e76-9ef399c73713",
+      "name": "Prompt — Attach Meta"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "XXwuLb0C-Qp03oDfC2JlC",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/XXwuLb0C-Qp03oDfC2JlC",
+          "cachedResultName": "Ops — Log chat_turn"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5136,
+        128
+      ],
+      "id": "d96654f0-c148-4291-9a0d-f63fdcc9555d",
+      "name": "Call 'Ops — Log chat_turn'"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kb/answer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -432,
+        -48
+      ],
+      "id": "ee8317d6-5a25-4034-b20f-eed6bb7bc43d",
+      "name": "Webhook",
+      "webhookId": "d3de4c60-5f27-430d-aa33-22ac35c89e58"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        4736,
+        0
+      ],
+      "id": "bbf5b939-bad3-431b-85bd-0ac2acf4be88",
+      "name": "Respond 200"
+    },
+    {
+      "parameters": {
+        "jsCode": "const secret = $vars.ANSWER_WEBHOOK_SECRET;\n\n// accept both header variants\nconst got =\n  $json?.headers?.[\"x-webhook-secret\"] ??\n  $json?.headers?.[\"X-Webhook-Secret\"] ??\n  $json?.headers?.[\"x-webhook-secret\".toLowerCase()] ??\n  $json?.headers?.[\"x-webhook-secret\"];\n\nif (!secret) {\n  throw new Error(\"Server misconfig: ANSWER_WEBHOOK_SECRET is not set\");\n}\n\nif (got !== secret) {\n  return [{\n    json: {\n      ok: false,\n      status: \"UNAUTHORIZED\",\n      message: \"Invalid webhook secret\",\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...$json,\n    ok: true,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        -48
+      ],
+      "id": "93bb8960-de05-4a3b-8ee8-e60b4bc06d50",
+      "name": "Validate Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "20836813-94df-4ff2-88ba-d3d578490ede",
+              "leftValue": "={{$json.ok}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -16,
+        -48
+      ],
+      "id": "115b7a3a-46a7-40a0-9ef5-ead49b2e424d",
+      "name": "IF — Validation OK?"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 401,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        208,
+        -32
+      ],
+      "id": "ea16d8e4-cc48-4577-abed-96deeeed1b7b",
+      "name": "Respond to Webhook 401"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert embedding array -> pgvector text \"[...]\" for safe SQL cast to vector\nconst j = $json ?? {};\n\nconst emb =\n  j.query_embedding ??\n  j.queryEmbedding ??\n  j.embedding ??\n  j.embeddings ??\n  null;\n\nif (!Array.isArray(emb) || emb.length === 0) {\n  return [{\n    json: {\n      ...j,\n      query_embedding_vec: null,\n      _err: \"no_query_embedding_array\",\n    }\n  }];\n}\n\n// ensure numbers, avoid \"null\"/\"NaN\"\nconst nums = emb.map(x => Number(x)).filter(x => Number.isFinite(x));\n\nif (nums.length === 0) {\n  return [{\n    json: {\n      ...j,\n      query_embedding_vec: null,\n      _err: \"embedding_not_numeric\",\n    }\n  }];\n}\n\n// pgvector accepts text like: [0.1,0.2,...]\nconst query_embedding_vec = `[${nums.join(\",\")}]`;\n\nreturn [{\n  json: {\n    ...j,\n    query_embedding_vec,\n    query_embedding_dim: nums.length,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        160
+      ],
+      "id": "90418a64-de71-40e2-8d33-ff50ed348142",
+      "name": "KB — Embedding to vector text"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\n\nconst ds = rows.map(r => Number(r.distance)).filter(Number.isFinite);\nconst min_distance = ds.length ? Math.min(...ds) : null;\nconst max_distance = ds.length ? Math.max(...ds) : null;\nconst avg_distance = ds.length ? ds.reduce((a,b)=>a+b,0)/ds.length : null;\n\nconst best = rows\n  .map(r => ({ ...r, _d: Number(r.distance) }))\n  .filter(r => Number.isFinite(r._d))\n  .sort((a,b)=>a._d-b._d)[0] ?? null;\n\nconst top_distance = best ? Number(best.distance) : null;\n\n// DEMO thresholds (cosine distance)\nconst T_ALLOW = 0.78;\nconst T_NO = 0.82;\n\nlet gate_mode = \"NO_ANSWER\";\nif (top_distance !== null) {\n  if (top_distance <= T_ALLOW) gate_mode = \"ALLOW\";\n  else if (top_distance <= T_NO) gate_mode = \"CLARIFY\";\n}\n\nreturn [{\n  json: {\n    ...(best ?? {}),\n    retrieval_rows: rows,\n    retrieved_count: rows.length,\n\n    top_distance_num: top_distance,\n    gate_mode,\n    gate_threshold_allow: T_ALLOW,\n    gate_threshold_no: T_NO,\n\n    distance_stats: { min: min_distance, avg: avg_distance, max: max_distance, n: ds.length },\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        160
+      ],
+      "id": "e12fc873-2ad1-48e6-91a5-0c8cac7e0c62",
+      "name": "Decide mode by top_distance"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.gate_mode}}",
+                    "rightValue": "ALLOW",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "df811815-1100-4e99-a5ec-ea12f793c8e2"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ALLOW"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0ab0cb51-46e7-4d0d-b494-f8f12a2cd13b",
+                    "leftValue": "={{$json.gate_mode}}",
+                    "rightValue": "CLARIFY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CLARIFY"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "953dcab2-f737-4439-b4dc-8501ca75035e",
+                    "leftValue": "={{$json.gate_mode}}",
+                    "rightValue": "NO_ANSWER",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "NO_ANSWER"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        160
+      ],
+      "id": "aec170da-c22e-430b-b779-d5c2bb1e7003",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (!items.length) {\n  return [{\n    json: {\n      gate_mode: \"CLARIFY\",\n      reply_text:\n        \"I found related fragments, but there's not enough context to answer.\\n\" +\n        \"1) What exactly is it about (name/ticker/link)?\\n\" +\n        \"2) What output do you want: a fact, a risk assessment, or a 2–3 bullet summary?\"\n    }\n  }];\n}\n\nfor (const item of items) {\n  const j = item.json;\n\n  const q = String(j.user_text ?? j.query ?? j.text ?? \"\").trim();\n\n  const q1 = \"What exactly is it about (name/ticker/link)?\";\n  const q2 = \"What output do you want: a fact, a risk assessment, or a 2–3 bullet summary?\";\n\n  // deterministic: 1–2 questions max\n  const questions = (q.length < 25) ? [q1, q2] : [q2];\n\n  j.gate_mode = j.gate_mode ?? \"CLARIFY\";\n  j.reply_text =\n    \"I found related fragments, but there's not enough context to answer.\\n\" +\n    questions.slice(0, 2).map((x, i) => `${i + 1}) ${x}`).join(\"\\n\");\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        96
+      ],
+      "id": "d5ce1c70-949a-4eca-a277-6c8c58b0b404",
+      "name": "Build Clarify Reply"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (!items.length) {\n  return [{\n    json: {\n      gate_mode: \"NO_ANSWER\",\n      reply_text:\n        \"I can't answer from the knowledge base: I couldn't find sufficiently close sources.\\n\" +\n        \"Please send: (1) the exact name/ticker/link and what you want to know, or (2) a short quote/text snippet.\"\n    }\n  }];\n}\n\nfor (const item of items) {\n  item.json.gate_mode = item.json.gate_mode ?? \"NO_ANSWER\";\n  item.json.reply_text =\n    \"I can't answer from the knowledge base: I couldn't find sufficiently close sources.\\n\" +\n    \"Please send: (1) the exact name/ticker/link and what you want to know, or (2) a short quote/text snippet.\";\n}\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        256
+      ],
+      "id": "fca06f08-f875-4427-a480-68047d328dda",
+      "name": "Build No Answer Reply"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = (items?.[0]?.json) ?? $json ?? {};\n\n// 1) mode: СНАЧАЛА gate_mode\nconst mode =\n  j?.gate_mode ??\n  j?.decision?.mode ??\n  j?.output?.mode ??\n  j?.mode ??\n  null;\n\n// 2) reply_text:\n// - если gate_mode=ALLOW -> бери ответ LLM (если есть), иначе fallback на уже собранный reply_text\nconst llm_reply =\n  j?.output?.reply_text ??\n  j?.output?.answer ??\n  j?.reply_text ??\n  j?.answer_text ??\n  \"\";\n\nconst reply_text = (mode === \"ALLOW\")\n  ? (llm_reply || j?.reply_text || \"\")\n  : (j?.reply_text || llm_reply || \"\");\n\n// 3) sources: если ALLOW — обязательно 1–3 из retrieval_rows/kb_sources\nlet sources =\n  j?.output?.sources ??\n  j?.output?.picked_hits ??\n  j?.picked_hits ??\n  j?.sources ??\n  j?.citations ??\n  [];\n\nconst fallback =\n  j?.kb_sources ??\n  j?.retrieval_rows ??\n  j?.retrieval?.hits ??\n  [];\n\nif (mode === \"ALLOW\" && (!Array.isArray(sources) || sources.length === 0)) {\n  sources = Array.isArray(fallback) ? fallback.slice(0, 3) : [];\n} else if (mode !== \"ALLOW\") {\n  sources = [];\n}\n\n// normalize source_url/url\nsources = (Array.isArray(sources) ? sources : []).map((s, idx) => ({\n  n: s?.n ?? (idx + 1),\n  chunk_id: s?.chunk_id,\n  doc: s?.doc,\n  section: s?.section,\n  source_url: s?.source_url ?? s?.url,\n  score: s?.score,\n  distance: s?.distance,\n}));\n\n// stats\nconst top_distance_num =\n  (typeof j?.top_distance_num === \"number\" ? j.top_distance_num : null) ??\n  (typeof j?.retrieval?.top_distance_num === \"number\" ? j.retrieval.top_distance_num : null) ??\n  null;\n\nconst distance_stats =\n  (j?.distance_stats && typeof j.distance_stats === \"object\") ? j.distance_stats :\n  null;\n\nreturn [{\n  json: {\n    ok: true,\n    gate_mode: mode,\n    reply_text,\n    sources,\n    top_distance_num,\n    distance_stats,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4544,
+        0
+      ],
+      "id": "434249eb-5c66-47ac-aabb-83ff2141bd6a",
+      "name": "Build HTTP Response"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3616,
+        -304
+      ],
+      "id": "7b6b7a70-6e16-4ff8-87a8-5c59bd6e7b75",
+      "name": "Merge"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4368,
+        0
+      ],
+      "id": "c1f983ab-59e4-463b-9bc4-d2dd966e95e5",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\n// где лежит вопрос\nconst userQ =\n  j?.user_text ??\n  j?.test_case?.query ??\n  j?.query ??\n  \"\";\n\n// где лежит контекст (как ты его называешь в Build Context)\nconst kbCtx =\n  j?.kb_context_text ??\n  j?.kb_context ??\n  j?.context_text ??\n  \"\";\n\n// prompt (после Prompt — Load)\nconst prompt =\n  j?.prompt_text ??\n  j?.data ??      // если Prompt Load кладет в data\n  \"\";\n\nconst llm_input =\n`${prompt}\n\n## KB CONTEXT\n${kbCtx}\n\n## USER QUESTION\n${userQ}\n`;\n\nreturn [{\n  json: {\n    ...j,\n    llm_input,\n    _debug_llm: {\n      has_prompt: !!prompt,\n      has_kb_context: !!kbCtx,\n      has_user_q: !!userQ,\n      user_q_preview: String(userQ).slice(0, 120),\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -112
+      ],
+      "id": "07a7ffc4-e230-4d6f-885e-ef3344d0dafc",
+      "name": "LLM Input"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3056,
+        -192
+      ],
+      "id": "52b2b03d-2e97-4675-8fbb-81b57b793ef2",
+      "name": "Merge2"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "meta": {
+            "request_id": "c14186e1-66f8-4b72-bc3d-648c372e1745",
+            "ts": "2025-12-17T14:43:33.319Z",
+            "channel": "telegram",
+            "prompt_version": "v1",
+            "chat_model": "day1_stub",
+            "embedding_model": "n/a",
+            "chat_id": 168487641
+          },
+          "input": {
+            "user_id": "168487641",
+            "question": "t"
+          },
+          "telegram": {
+            "update_id": 15493757,
+            "message": {
+              "message_id": 57,
+              "from": {
+                "id": 168487641,
+                "is_bot": false,
+                "first_name": "Arseniy",
+                "last_name": "Ostroumov",
+                "username": "arseniy_ostroumov",
+                "language_code": "en"
+              },
+              "chat": {
+                "id": 168487641,
+                "first_name": "Arseniy",
+                "last_name": "Ostroumov",
+                "username": "arseniy_ostroumov",
+                "type": "private"
+              },
+              "date": 1765982613,
+              "text": "t"
+            }
+          },
+          "retrieval": {
+            "top_k": 5,
+            "hits": [],
+            "top_score": null
+          },
+          "decision": {
+            "mode": "ALLOW",
+            "reason": "day1_stub"
+          },
+          "output": {
+            "answer": "",
+            "sources": []
+          },
+          "error": null,
+          "timers": {
+            "t_start_ms": 1765982613319
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "KB — Input Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Input Normalize": {
+      "main": [
+        [
+          {
+            "node": "OpenAI — Embeddings (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI — Embeddings (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "KB — Extract Query Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Extract Query Embedding": {
+      "main": [
+        [
+          {
+            "node": "KB — Embedding to vector text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB — Retrieve kb_chunks (topK)": {
+      "main": [
+        [
+          {
+            "node": "Decide mode by top_distance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Build Context": {
+      "main": [
+        [
+          {
+            "node": "Prompt — Load answer.md",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Build Sources": {
+      "main": [
+        [
+          {
+            "node": "KB — Build Final Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Build Final Reply": {
+      "main": [
+        [
+          {
+            "node": "KB — Strip Heavy Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Strip Heavy Fields": {
+      "main": [
+        [
+          {
+            "node": "Call 'Ops — Log chat_turn'",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ops — Finalize Fallback": {
+      "main": [
+        [
+          {
+            "node": "Ops — Strip Heavy Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ops — Strip Heavy Fields": {
+      "main": [
+        [
+          {
+            "node": "Call 'Ops — Log chat_turn'",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "OpenAI — Answer v1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "KB — Parse Answer": {
+      "main": [
+        [
+          {
+            "node": "KB — Build Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt — Load answer.md": {
+      "main": [
+        [
+          {
+            "node": "Prompt — Attach Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt — Attach Meta": {
+      "main": [
+        [
+          {
+            "node": "LLM Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "IF — Validation OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Validation OK?": {
+      "main": [
+        [
+          {
+            "node": "KB — Input Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Embedding to vector text": {
+      "main": [
+        [
+          {
+            "node": "DB — Retrieve kb_chunks (topK)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide mode by top_distance": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "KB — Build Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Clarify Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build No Answer Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Clarify Reply": {
+      "main": [
+        [
+          {
+            "node": "Ops — Finalize Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build No Answer Reply": {
+      "main": [
+        [
+          {
+            "node": "Ops — Finalize Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build HTTP Response": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "KB — Parse Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Build HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Input": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "OpenAI — Answer v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4f2db9cc-1090-4fa8-8d94-635916099a89",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"
+  },
+  "id": "8ZH9DHPDAa0BlO382T7KD",
+  "tags": []
+}

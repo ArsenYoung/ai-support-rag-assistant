@@ -1,0 +1,569 @@
+{
+  "name": "KB — Ingest v1 (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "function slug(s) {\n  return String(s)\n    .toLowerCase()\n    .trim()\n    .replace(/[\\s\\/]+/g, \"-\")\n    .replace(/[^a-z0-9\\-_]+/g, \"\")\n    .slice(0, 80);\n}\n\nconst { kb_ref, doc, section, source_url, tags, doc_id, text } = $json;\n\nconst TARGET = 850;\nconst OVERLAP = 120;\n\nconst hard = String(text).replace(/\\r\\n/g, \"\\n\").trim();\nconst parts = hard.split(/\\n{2,}/g).map(s => s.trim()).filter(Boolean);\n\nlet chunks = [];\nlet buf = \"\";\n\nfunction pushBuf() {\n  const t = buf.trim();\n  if (t) chunks.push(t);\n}\n\nfor (const p of parts) {\n  if ((buf + \"\\n\\n\" + p).length <= TARGET) {\n    buf = buf ? (buf + \"\\n\\n\" + p) : p;\n  } else {\n    pushBuf();\n    const tail = buf.slice(Math.max(0, buf.length - OVERLAP));\n    buf = (tail ? tail + \"\\n\\n\" : \"\") + p;\n  }\n}\npushBuf();\n\nconst now = new Date().toISOString();\n\nreturn chunks.map((chunk_text, i) => {\n  const chunk_id = `${kb_ref}__${slug(doc)}__${slug(section)}__${i}`;\n\n  return {\n    json: {\n      chunk_id,\n      kb_ref,\n      doc,\n      section,\n      source_url: source_url || null,\n      doc_id: doc_id || null,\n      chunk_text,\n      chunk_index: i,\n      tags: Array.isArray(tags) ? tags : null,\n      updated_at: now\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        320
+      ],
+      "id": "3ef97cef-4586-43af-a9d4-810b6e5d199a",
+      "name": "KB — Chunk Docs v1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "text-embedding-3-small"
+            },
+            {
+              "name": "input",
+              "value": "=={{$json.embedding_input}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1056,
+        320
+      ],
+      "id": "ac225b74-238b-49c8-80e8-ed70323092a6",
+      "name": "OpenAI — Embeddings (HTTP)",
+      "retryOnFail": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "szpBWy88gJHBt0BR",
+          "name": "OpenAi account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tags_json = Array.isArray($json.tags) ? JSON.stringify($json.tags) : null;\n\nreturn [{\n  json: {\n    ...$json,\n    embedding_input: $json.chunk_text,\n    tags_json\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        320
+      ],
+      "id": "00b69819-b8e3-402f-a5db-c9398dc724bb",
+      "name": "KB — Snapshot Chunk"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chunk = $items(\"KB — Snapshot Chunk\")[0].json;\nconst emb = $json?.data?.[0]?.embedding;\n\nif (!Array.isArray(emb)) {\n  throw new Error(\"No embedding found at data[0].embedding\");\n}\n\nconst embedding_vector = `[${emb.join(\",\")}]`;\nreturn [{\n  json: {\n    ...chunk,\n    embedding: embedding_vector\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        320
+      ],
+      "id": "ec943c25-dcaa-4d92-a8a6-e01afaf8798d",
+      "name": "KB — Merge Embedding"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with p as (\n  select $1::jsonb as j\n)\ninsert into public.kb_chunks\n  (chunk_id, kb_ref, doc, section, chunk_index, content, embedding, source_url, created_at)\nselect\n  (j->>'chunk_id')::text,\n  (j->>'kb_ref')::text,\n  (j->>'doc')::text,\n  nullif(j->>'section','')::text,\n  (j->>'chunk_index')::int,\n  nullif(j->>'chunk_text','')::text,\n  (j->>'embedding')::vector,\n  nullif(j->>'source_url','')::text,\n  now()\nfrom p\non conflict (chunk_id) do update set\n  kb_ref      = excluded.kb_ref,\n  doc         = excluded.doc,\n  section     = excluded.section,\n  chunk_index = excluded.chunk_index,\n  content     = excluded.content,\n  embedding   = excluded.embedding,\n  source_url  = excluded.source_url;",
+        "options": {
+          "queryReplacement": "=={{ JSON.stringify({\n  chunk_id: $json.chunk_id,\n  kb_ref: $json.kb_ref,\n  doc: $json.doc,\n  section: $json.section ?? \"\",\n  chunk_index: $json.chunk_index,\n  chunk_text: $json.chunk_text,\n  embedding: $json.embedding,\n  source_url: $json.source_url\n}) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1488,
+        320
+      ],
+      "id": "7b7ae870-3ff3-4ae5-add9-43bf554c94cf",
+      "name": "DB — Upsert kb_chunks",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kb/ingest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -880,
+        384
+      ],
+      "id": "74512026-f976-43f4-aba1-7573c04d7fcb",
+      "name": "KB — Ingest Webhook",
+      "webhookId": "f2a6e09c-d367-4dfe-bee4-df71b338e49e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// KB — Ingest v1 (Webhook) :: Validate Input (Code node)\n// No require('url') — disallowed in n8n Cloud sandbox.\n// Canonicalize only X/Twitter status URLs using regex.\n\nconst b = $json?.body ?? $json;\n\n// --- Auth (webhook secret) ---\nconst secret = $vars.INGEST_WEBHOOK_SECRET;\nconst got =\n  $json?.headers?.[\"x-webhook-secret\"] ??\n  $json?.headers?.[\"X-Webhook-Secret\"] ??\n  $json?.request?.headers?.[\"x-webhook-secret\"] ??\n  $json?.request?.headers?.[\"X-Webhook-Secret\"];\n\nif (!secret) throw new Error(\"INGEST_WEBHOOK_SECRET missing in n8n Variables\");\n\nif (got !== secret) {\n  return [{ json: { ok: false, status: \"UNAUTHORIZED\" } }];\n}\n\n// --- Helpers ---\nfunction cleanStr(v) {\n  return (v ?? \"\").toString().trim();\n}\n\n// Returns canonical x.com status URL OR null\nfunction canonicalizeXStatusUrl(input) {\n  const s = cleanStr(input);\n  if (!s) return null;\n\n  // accept: https://x.com/<handle>/status/<id>...\n  //         https://twitter.com/<handle>/status/<id>...\n  //         with www./mobile. prefixes, and optional tail/query/hash\n  const re = /^https?:\\/\\/(?:(?:www|mobile)\\.)?(x\\.com|twitter\\.com)\\/([A-Za-z0-9_]{1,15})\\/status\\/(\\d+)(?:[/?#].*)?$/i;\n  const m = s.match(re);\n  if (!m) return null;\n\n  const handle = m[2];\n  const tweetId = m[3];\n  return `https://x.com/${handle}/status/${tweetId}`;\n}\n\n// detect if URL looks like it belongs to x/twitter at all\nfunction isXorTwitterUrl(input) {\n  const s = cleanStr(input);\n  if (!s) return false;\n  return /^https?:\\/\\/(?:(?:www|mobile)\\.)?(x\\.com|twitter\\.com)\\//i.test(s);\n}\n\n// --- Required fields ---\nconst kb_ref = cleanStr(b.kb_ref);\nconst doc = cleanStr(b.doc);\nconst section = cleanStr(b.section);\nconst text = cleanStr(b.text);\n\nconst missing = [];\nif (!kb_ref) missing.push(\"kb_ref\");\nif (!doc) missing.push(\"doc\");\nif (!section) missing.push(\"section\");\nif (!text) missing.push(\"text\");\n\nif (missing.length) {\n  return [{\n    json: {\n      ok: false,\n      error: { code: \"missing_required_fields\", missing }\n    }\n  }];\n}\n\n// --- source_url normalize (Variant A) ---\nlet source_url_raw = cleanStr(b.source_url);\nlet source_url = null;\n\nif (source_url_raw) {\n  const canon = canonicalizeXStatusUrl(source_url_raw);\n\n  if (canon) {\n    source_url = canon;\n  } else if (isXorTwitterUrl(source_url_raw)) {\n    // strict: x/twitter but not a status link → drop\n    source_url = null;\n  } else {\n    // non-x URLs: keep as-is (no parsing in sandbox)\n    source_url = source_url_raw;\n  }\n}\n\n// --- Output (normalized payload for downstream ingest) ---\nreturn [{\n  json: {\n    ok: true,\n    kb_ref,\n    doc,\n    section,\n    source_url, // canonical or null\n    tags: Array.isArray(b.tags) ? b.tags : null,\n    doc_id: b.doc_id || null,\n    replace: !!b.replace,\n    text\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        384
+      ],
+      "id": "30501796-1fe6-4bb5-a80b-213c10f0113d",
+      "name": "Validate Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "99f61172-b74a-4acf-b9a7-13f16f208719",
+              "leftValue": "={{$json.replace}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -256,
+        304
+      ],
+      "id": "ecc0e4b4-05e8-4bd2-8f02-7a51c1292949",
+      "name": "IF: KB — Replace?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3efcaa7a-6bc4-4d97-a386-ccb539607719",
+              "leftValue": "={{$json.doc_id && $json.doc_id !== \"\"}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -48,
+        176
+      ],
+      "id": "816be0da-453a-43ed-959f-b0c2633ed7e8",
+      "name": "IF: KB — Has doc_id?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "delete from public.kb_chunks\nwhere kb_ref = $1 and doc = $2;",
+        "options": {
+          "queryReplacement": "={{$json.kb_ref}}, {{$json.doc_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "eb073c02-6142-4b65-a1a4-c5bb0fda2abe",
+      "name": "DB — Delete kb_chunks by doc_id",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "delete from public.kb_chunks\nwhere kb_ref = $1 and doc = $2 and section = $3;",
+        "options": {
+          "queryReplacement": "={{$json.kb_ref}}, {{$json.doc}}, {{$json.section}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        192
+      ],
+      "id": "8b166018-3bbe-4cae-92b7-45f2553148c2",
+      "name": "DB — Delete kb_chunks by doc+section",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берём исходный нормализованный item из ноды Validate Input\nconst original = $items(\"Validate Input\")[0].json;\nreturn [{ json: original }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        96
+      ],
+      "id": "915e0ee4-fee9-4ab7-9ca0-7c7e2b1891e2",
+      "name": "KB — Restore Payload"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1904,
+        320
+      ],
+      "id": "4a2673c9-567f-4c6e-9479-9c6579144cc7",
+      "name": "KB — Respond"
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $items(\"Validate Input\")[0].json;\nconst chunksCount = $items(\"KB — Chunk Docs v1\").length;\nconst lastChunk = $items(\"KB — Chunk Docs v1\")[chunksCount - 1]?.json;\n\nreturn [{\n  json: {\n    ok: true,\n    kb_ref: original.kb_ref,\n    doc: original.doc,\n    section: original.section,\n    doc_id: original.doc_id,\n    replace: original.replace,\n    chunks_upserted: chunksCount,\n    last_chunk_id: lastChunk?.chunk_id ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        320
+      ],
+      "id": "41c268f6-9916-4a41-87aa-e7e1b87aa5bb",
+      "name": "KB — Restore For Response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d084a3c5-a7ce-497c-acbf-878ce597599f",
+              "leftValue": "={{$json.ok}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -464,
+        384
+      ],
+      "id": "46a21e3a-768a-4595-a51b-ed9ff2df1f3b",
+      "name": "IF — Validation OK?"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={ \"ok\": true, \"accepted\": true }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -256,
+        144
+      ],
+      "id": "6ba8713b-c9b3-413a-a5aa-9c5bdc62fc9e",
+      "name": "Respond to Webhook 200"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 401,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -256,
+        496
+      ],
+      "id": "21c5d2f6-7681-49eb-b63c-019e896bf2d5",
+      "name": "Respond to Webhook 401"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "KB — Chunk Docs v1": {
+      "main": [
+        [
+          {
+            "node": "KB — Snapshot Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI — Embeddings (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "KB — Merge Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Snapshot Chunk": {
+      "main": [
+        [
+          {
+            "node": "OpenAI — Embeddings (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Merge Embedding": {
+      "main": [
+        [
+          {
+            "node": "DB — Upsert kb_chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB — Upsert kb_chunks": {
+      "main": [
+        [
+          {
+            "node": "KB — Restore For Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Ingest Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "IF — Validation OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: KB — Replace?": {
+      "main": [
+        [
+          {
+            "node": "IF: KB — Has doc_id?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "KB — Chunk Docs v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: KB — Has doc_id?": {
+      "main": [
+        [
+          {
+            "node": "DB — Delete kb_chunks by doc_id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DB — Delete kb_chunks by doc+section",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB — Delete kb_chunks by doc_id": {
+      "main": [
+        [
+          {
+            "node": "KB — Restore Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB — Delete kb_chunks by doc+section": {
+      "main": [
+        [
+          {
+            "node": "KB — Restore Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Restore Payload": {
+      "main": [
+        [
+          {
+            "node": "KB — Chunk Docs v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB — Restore For Response": {
+      "main": [
+        [
+          {
+            "node": "KB — Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Validation OK?": {
+      "main": [
+        [
+          {
+            "node": "IF: KB — Replace?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook 200",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook 200": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4b39eac1-9d0f-4ec1-85c1-9d0d9e1b70a7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"
+  },
+  "id": "IWJLAsXirxK822QDQr1mU",
+  "tags": []
+}

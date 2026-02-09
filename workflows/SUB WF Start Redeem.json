@@ -1,0 +1,301 @@
+{
+  "name": "SUB WF Start Redeem",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -992,
+        400
+      ],
+      "id": "7e98c57e-0f02-4748-9912-f55209beb652",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = String($json?.input?.question ?? \"\").trim(); // /start ...\nconst parts = text.split(/\\s+/);\nconst token = parts.length >= 2 ? parts[1] : null;\n\nreturn [{\n  json: {\n    ...$json,\n    token,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        400
+      ],
+      "id": "6876b4b8-59d8-4d8d-8ab4-78a96ae5e760",
+      "name": "Parse start token"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with found as (\n  select token, expires_at, consumed_at\n  from public.demo_invites\n  where token = $1\n),\nredeemed as (\n  update public.demo_invites\n  set consumed_at = now(),\n      chat_id = $2,\n      user_id = $3\n  where token = $1\n    and consumed_at is null\n    and expires_at > now()\n  returning token\n),\nallowed as (\n  insert into public.allowed_chats (chat_id, user_id, expires_at, last_seen_at, is_active, role)\n  select $2, $3, now() + interval '24 hours', now(), true, coalesce((select role from public.allowed_chats where chat_id = $2), 'user')\n  where exists (select 1 from redeemed)\n  on conflict (chat_id) do update\n  set user_id = excluded.user_id,\n      expires_at = now() + interval '24 hours',\n      last_seen_at = now(),\n      is_active = true\n  returning chat_id\n)\nselect\n  case\n    when not exists (select 1 from found) then 'NOT_FOUND'\n    when (select expires_at from found) <= now() then 'EXPIRED'\n    when (select consumed_at from found) is not null then 'USED'\n    when exists (select 1 from redeemed) then 'OK'\n    else 'UNKNOWN'\n  end as status,\n  (select count(*) from redeemed) as redeemed,\n  (select count(*) from allowed) as allowed_written;\n",
+        "options": {
+          "queryReplacement": "={{$json.token}}, {{$json.meta.chat_id}}, {{$json.input.user_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        32,
+        224
+      ],
+      "id": "57b45606-e0be-49dc-a780-41e5ccf36714",
+      "name": "Redeem token",
+      "credentials": {
+        "postgres": {
+          "id": "qs9FA0xQaKSneWtC",
+          "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Этот запрос:\n- проверит, что токен существует/не использован/не истёк\n- пометит used_at + привяжет chat_id\n- добавит chat_id в whitelist\n- вернёт статус",
+        "height": 368,
+        "width": 192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c2b5842e-72bb-46e9-9439-24500e63a9b9",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8c074d33-6590-44ce-893b-0b5c98c41961",
+              "leftValue": "={{$json.redeemed}}",
+              "rightValue": "1",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        496,
+        320
+      ],
+      "id": "8030a91e-4edb-4dec-98bc-beff3066b5c6",
+      "name": "IF redeemed?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $json.token;\n\nlet is_valid_format = true;\n\n// Если токена нет — это НЕ \"invalid format\", это просто \"missing token\"\nif (!token) {\n  return [{\n    json: {\n      ...$json,\n      is_valid_format: true,\n      token_missing: true,\n    }\n  }];\n}\n\n// Если ты используешь hash (hex) — оставь так.\n// Если токены у тебя типа \"CEODEMO-9F3KQ2\" — ЭТА проверка будет всегда false.\nconst isHex = /^[0-9a-fA-F]+$/.test(token);\nconst isLenOk = token.length >= 20;\n\nis_valid_format = isHex && isLenOk;\n\nreturn [{\n  json: {\n    ...$json,\n    is_valid_format,\n    token_missing: false,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        400
+      ],
+      "id": "3ee5a43c-27f5-4c60-b1a8-2202631aa72b",
+      "name": "Validate token"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        304,
+        320
+      ],
+      "id": "4a6bd15c-808f-417d-ba9d-06389f2fae34",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a38b59ec-a198-43eb-9e2b-c2e95af55f91",
+              "leftValue": "={{ !!$json.token && $json.is_valid_format === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -416,
+        400
+      ],
+      "id": "39ccd000-fcdb-4ac3-8960-5cc1ae961c36",
+      "name": "IF token present + valid"
+    },
+    {
+      "parameters": {
+        "jsCode": "const reply_text = \"✅ Access granted\";\n\nconst chat_id =\n  $json?.meta?.chat_id ??\n  $json?.telegram?.message?.chat?.id ??\n  null;\n\nreturn [{\n  json: {\n    ...$json,\n    ok: true,\n    code: \"OK\",\n    chat_id,\n    reply_text,\n    output: {\n      ...( $json.output ?? {} ),\n      reply_text,\n    },\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        224
+      ],
+      "id": "2d33063e-8add-4bbb-864f-0d6333b26072",
+      "name": "Return OK"
+    },
+    {
+      "parameters": {
+        "jsCode": "// unified status from SQL (preferred), fallback to old fields\nconst status =\n  $json.status ??\n  $json.redeem_status ??\n  (\n    !$json.token ? \"NO_TOKEN\"\n    : ($json.is_valid_format === false ? \"INVALID_FORMAT\"\n    : \"UNKNOWN\")\n  );\n\nconst msg = {\n  NO_TOKEN: \"🔒 Use: /start YOUR_TOKEN\",\n  INVALID_FORMAT: \"⚠️ Invalid token format.\",\n  NOT_FOUND: \"❌ Invalid token. Ask admin for a fresh /invite.\",\n  EXPIRED: \"⏳ Token expired. Ask admin for a fresh /invite.\",\n  USED: \"🚫 Token already used. Ask admin for a fresh /invite.\",\n  UNKNOWN: \"⚠️ Can't redeem token. Try again later.\",\n};\n\nconst reply_text = msg[status] || msg.UNKNOWN;\n\nconst chat_id =\n  $json?.meta?.chat_id ??\n  $json?.telegram?.message?.chat?.id ??\n  null;\n\nreturn [{\n  json: {\n    ...$json,\n    ok: false,\n    code: status,\n    chat_id,\n    output: {\n      ...( $json.output ?? {} ),\n      reply_text,\n    },\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        416
+      ],
+      "id": "20cd07f7-b5f1-442b-ba36-6a0e9b45bf1f",
+      "name": "Return ERR"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse start token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse start token": {
+      "main": [
+        [
+          {
+            "node": "Validate token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redeem token": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF redeemed?": {
+      "main": [
+        [
+          {
+            "node": "Return OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return ERR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate token": {
+      "main": [
+        [
+          {
+            "node": "IF token present + valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "IF redeemed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF token present + valid": {
+      "main": [
+        [
+          {
+            "node": "Redeem token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Return ERR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "3b9b4589-d25c-4be9-a16b-5cf7b74e440f",
+  "meta": {
+    "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"
+  },
+  "id": "ejV49H1_M06MR8cO4yybT",
+  "tags": []
+}

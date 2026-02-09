@@ -1,0 +1,160 @@
+{
+  "name": "WF Demo Loader → KB Ingest",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        0
+      ],
+      "id": "c4846779-a6f5-4ac0-ba18-d149ae35071a",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build demo items for KB ingest\n// Output: one item with { items: [...] } where each element is one post payload for /kb/ingest\n\nconst kb_ref = \"ceo_x_demo\";\n\nconst altsteinn = [\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_01\",\n    text:\n`I gave you $PNUT at $2.7m, it went to $2.5B. 915x\n\nI gave you $NEIRO at $2.5m, it went to 1.2B. 500x\n\nI gave you #Titcoin at $450k, it went to $95m. 250x\n\nI gave you #retire at $130k, it went to $20m. 150x\n\nI gave you #PETUNIA at $250k, it went to $45M. 180x\n\nI gave you $DOG at $125k, it went to $14M. 110x\n\nAnd you are still on the FREE TG?\n\nStay poor or join with the link in the comments.`,\n    source_url: \"https://x.com/Altsteinn/status/1928531317475459373\",\n    tags: [\"demo\", \"altsteinn\", \"promo\", \"returns\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_02\",\n    text:\n`I'll be actively trenching in the GEM CLUB this weekend\n\nI'll quote this with our profits on Monday!\n\nJoin us here: t.me/ALSTEIN_GEMCLUB`,\n    source_url: \"https://x.com/Altsteinn/status/2019983556853092526\",\n    tags: [\"demo\", \"altsteinn\", \"promo\", \"telegram\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_03\",\n    text:\n`If you got $1 for every Pumpfun token launched, you’d make about $30,000 a day.\n\nIf you got $1 for every token that graduates – you’d make $290 a day.\n\nThat’s a 1% success rate. The system was never designed for you to win.`,\n    source_url: \"https://x.com/Altsteinn/status/2019142364527575364\",\n    tags: [\"demo\", \"altsteinn\", \"stats\", \"pumpfun\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_04\",\n    text:\n`no bro, yesterday was our BEST trading day in February so far\n\n$Buttcoin hit a new high and printed 30x YESTERDAY\n\nAll our shorts we're printing crazy:\n\n$ETH short - +17k% on 500x lev.\n$BTC short - +2.2k% on 125x lev.\n$PENGUIN short - +1.2k% on 20x lev.\n\nall entries were public too. BUILT DIFFERENT.`,\n    source_url: \"https://x.com/Altsteinn/status/2019008029535174997\",\n    tags: [\"demo\", \"altsteinn\", \"pnl\", \"shorts\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_05\",\n    text:\n`Lots of traders don't trust memes that have never hit a million cap and that's why they die early\n\nso I'll help a DESERVING memecoin today\n\nI'll buy 2-3% of the supply and take it to a million so they can easily hit $10m and run me a 10x\n\nwin-win\n\nwhich memecoin deserves it?`,\n    source_url: \"https://x.com/Altsteinn/status/2019021870943625308\",\n    tags: [\"demo\", \"altsteinn\", \"memecoin\", \"influence\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_06\",\n    text:\n`I still can't find a reason why $Epstein won't run\n\nalready has the virality and it gets even more viral with more influential people getting involved\n\nand the chart is also clearly bullish`,\n    source_url: \"https://x.com/Altsteinn/status/2018303237430886553\",\n    tags: [\"demo\", \"altsteinn\", \"memecoin\", \"bullish\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_07\",\n    text:\n`only if you made money from the TG last month\n\nhere’s some cults you can rotate profits to:\n\n$KORI under $2M\n$MOMO at $2M\n$AURA at $12M\n$SACHI under $2M\n\nam I missing anything?`,\n    source_url: \"https://x.com/Altsteinn/status/2018257518594531403\",\n    tags: [\"demo\", \"altsteinn\", \"rotation\", \"tokens\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_08\",\n    text:\n`you’re really going to take advice from the same influencers that got wiped by the crash? they’re no better than you tbh\n\ntake it from ME that caught the BTC short at $90k and the ETH short at $3.3k\n\nwe need levels around $75k to confirm the reversal\n\n[200 likes gets chart]`,\n    source_url: \"https://x.com/Altsteinn/status/2018021976485347633\",\n    tags: [\"demo\", \"altsteinn\", \"btc\", \"eth\", \"reversal\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_09\",\n    text:\n`It's sad how fast we lost the STRONGEST CULT I ever seen\n\naeons claimed to not care about charts / price action but now that the chart is dead, where are they now?\n\nRIP $SPX`,\n    source_url: \"https://x.com/Altsteinn/status/2017870536521748845\",\n    tags: [\"demo\", \"altsteinn\", \"cult\", \"spx\"]\n  },\n  {\n    doc: \"x_altsteinn\",\n    section: \"tweet_10\",\n    text:\n`don’t let anyone bullshit you into thinking last month was bad for crypto\n\nwe finished with an 88% win rate across 25 trades and caught runners like:\n\n$Buttcoin - 25x\n$ZHC - 20x\n$SHITCOIN - 15x\n$WHALEFLOKI - 13x\n$MCV - 11x\n$HORSE - 10x\n$HSMA - 6x\n$SAMELIA - 5x\n$AIDEN - 5x\n$GRU - 5x\n$SHARK - 5x\n$TATA - 4x\n$Shrimp - 4x\n\nand even 2-3x plays that I can’t start listing.\n\nJoin the winning group while it’s still the 1st of February\n\nIt’s FREE (for now): t.me/ALSTEIN_GEMCLUB`,\n    source_url: \"https://x.com/Altsteinn/status/2017842777459962354\",\n    tags: [\"demo\", \"altsteinn\", \"winrate\", \"promo\"]\n  }\n];\n\n// TODO: add 10 deg_ape posts (same shape)\nconst deg_ape = [\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_01\",\n    text:\n`2025 JOURNAL 🔥\n\nAlthough the crypto market underperformed other assets, we did dominate the low cap plays in the trenches\n\nhere are our top gains,\n\n- #401jk : 270X ⚡\n- $MANYU : 100X ⚡\n- $TST : 50X ⚡\n- $FWOG : 100X ⚡\n\n- $QF : 40X\n- $GIGGLE : 30X\n- $ASTER : 30X\n- $4 : 20X\n\n- $BERT : 10X\n- $SACHI : 5X\n- $AURA : 10X\n- $UFD : 5X\n\nand many more Ws within my Telegram community. Our goal remains same for 2026... to make it all back & retire early\n\nLOCK IN for that generational wealth 🔥`,\n    source_url: \"https://x.com/deg_ape/status/2004486343079100481\",\n    tags: [\"demo\", \"deg_ape\", \"journal\", \"returns\"]\n  },\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_02\",\n    text:\n`Altcoins just broke a 4.5-year downtrend vs Bitcoin 🚨\n\nevery rally since 2021 failed with lower highs. $BTC dominance was untouchable, but now that structure is broken\n\ncapital is rotating WITHIN crypto, not exiting, the same pattern we saw in early 2020 before the market went parabolic\n\nWhatever happens next, volatility is guaranteed\n\nstay positioned, we are about to witness history in 2026`,\n    source_url: \"https://x.com/deg_ape/status/2020422247417278896\",\n    tags: [\"demo\", \"deg_ape\", \"macro\", \"altcoins\"]\n  },\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_03\",\n    text:\n`$Whalentine Update 🚨\n\nPrice is consolidating before the next upside leg. Our bags are already 2x and we aren't even in peak love season\n\nI see dev is active, organizing spaces, AMAs and giveaways to the community.\n\nHeard theres 5 SOL giveaway in today's Pumpfun Live at 6:30pm EST. Don't miss it.\n\nIts a million dollar valentine meta in 2026\n\nwe are still early 🔥`,\n    source_url: \"https://x.com/deg_ape/status/2019792629500965359\",\n    tags: [\"demo\", \"deg_ape\", \"update\", \"whalentine\"]\n  },\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_04\",\n    text:\n`survival is the alpha\n\n$BIGTROUT just pulled a 2x while everything else lost half its value\n\n$3M --> $6M\n\nBigtrout is still active and pushing hard with the community. This is what separated money looks like.\n\nmore higher..... 🐟✅`,\n    source_url: \"https://x.com/deg_ape/status/2019693890635460641\",\n    tags: [\"demo\", \"deg_ape\", \"relative_strength\", \"bigtrout\"]\n  },\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_05\",\n    text:\n`the generational bottom is in\n\n$BTC - $60k\n$ETH - $1700\n$SOL - $67\n\ntime to stack in for the final ascend\n\nare you locked in???`,\n    source_url: \"https://x.com/deg_ape/status/2019645911828427203\",\n    tags: [\"demo\", \"deg_ape\", \"bottom\", \"btc\", \"eth\", \"sol\"]\n  },\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_06\",\n    text:\n`Unpopular opinion: $Penguin isn't done\n\neveryone thinks it's finished but look at what it actually did,\n- big handles posted it\n- made it to mainstream headlines, not just CT\n- global influencers going viral with it\n- the walk resonated with normies - that's rare\n\nno way $Penguin cult is dying this early\n\nIt's just hibernating.. 🐧`,\n    source_url: \"https://x.com/deg_ape/status/2019361677788213476\",\n    tags: [\"demo\", \"deg_ape\", \"penguin\", \"cult\"]\n  },\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_07\",\n    text:\n`study this relative strength in $WhiteWhale\n\nyou could've printed an easy 5X if you aped with me at the $30M bottom. Some memes overcome FUD and show strength.\n\nOthers just scramble down with market volatility\n\nLearn to spot the difference early\n\nI'm holding every single #WhiteWhale token\n\nSee you at ATH 😉`,\n    source_url: \"https://x.com/deg_ape/status/2019440569635016784\",\n    tags: [\"demo\", \"deg_ape\", \"whitewhale\", \"relative_strength\"]\n  },\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_08\",\n    text:\n`how tf is $BigTrout cooking so well 🤯\n\nevery other major meme is struggling even to survive out there. Love the way @BigTrout300 is initiating and speaking to community with transparency\n\ncreator fees are already utilized in LP\n\nseems good narrative to push in this market`,\n    source_url: \"https://x.com/deg_ape/status/2019305625659011239\",\n    tags: [\"demo\", \"deg_ape\", \"bigtrout\", \"narrative\"]\n  },\n  {\n    doc: \"x_deg_ape\",\n    section: \"tweet_09\",\n    text:\n`This is the steepest dump I've ever witnessed\n\n$BTC - 30%\n$ETH - 40%\nALTS - [redacted]\n\nNot even a dead cat bounce, its just pure, unfiltered capitulation\n\nare we cooked???`,\n    source_url: \"https://x.com/deg_ape/status/2019300673234608148\",\n    tags: [\"demo\", \"deg_ape\", \"capitulation\", \"drawdown\"]\n  },\n\n  // TODO: add 1 more deg_ape post to make 10\n  {\n  doc: \"x_deg_ape\",\n  section: \"tweet_10\",\n  text:\n`$Whalentine is ready for another upside leg 🔥\n\nAs the Valentine week is approaching this love meta is gaining immense strength. Even in a bleeding market, $Whalentine is not just holding ground, it’s dominating the trenches\n\ndev is fueling up with top tier listings, buybacks & utilities for us\n\nI won't be surprised if this click millions from here\n\nStay locked in chads!`,\n  source_url: \"https://x.com/deg_ape/status/2019004971945984460\",\n  tags: [\"demo\", \"deg_ape\", \"whalentine\", \"update\"]\n}\n];\n\n\nconst items = [...altsteinn, ...deg_ape].map((p) => ({\n  kb_ref,\n  doc: p.doc,\n  section: p.section,\n  text: p.text,\n  source_url: p.source_url,\n  tags: p.tags ?? [\"demo\"]\n}));\n\nreturn [{ json: { items } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        0
+      ],
+      "id": "c7899d78-eb0f-4035-a3c5-07625f06e870",
+      "name": "Build demo items"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "58e46f14-105d-4196-a056-5d1494d004c4",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://arseniiostroumov.app.n8n.cloud/webhook/kb/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-webhook-secret",
+              "value": "={{$vars.INGEST_WEBHOOK_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "dbb090e0-b8ae-4a98-a01b-40f3bb377214",
+      "name": "POST to KB — Ingest webhook",
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize demo payload that has shape: { items: [ ... ] }\n// Add silent/source/demo_batch/trace_id to EACH inner item.\n\nconst run_ts = new Date().toISOString();\nconst root = items[0]?.json ?? {};\n\nconst demo_batch = root.demo_batch ?? run_ts;\nconst kb_ref  = root.kb_ref ?? \"ceo_x_demo\";\nconst chat_id = root.chat_id ?? root.tg_chat_id ?? 0;\nconst user_id = root.user_id ?? root.tg_user_id ?? 0;\n\nconst trace_base =\n  root.trace_id ??\n  `demo_${kb_ref}_${chat_id}_${user_id}_${demo_batch.replace(/[^0-9]/g, \"\").slice(0, 14)}`;\n\nconst arr = Array.isArray(root.items) ? root.items : [];\n\nconst normalized = arr.map((it, idx) => ({\n  ...it,\n  silent: true,\n  source: \"demo\",\n  demo_batch,\n  trace_id: `${trace_base}_${String(idx + 1).padStart(2, \"0\")}`,\n}));\n\nreturn [{\n  json: {\n    ...root,\n    items: normalized,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "7b30a811-21fe-431d-a365-3bbf3b426afe",
+      "name": "Normalize demo items"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Build demo items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build demo items": {
+      "main": [
+        [
+          {
+            "node": "Normalize demo items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "POST to KB — Ingest webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to KB — Ingest webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Normalize demo items": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4313f689-a0c9-40d7-8f49-531569221f1e",
+  "meta": {
+    "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"
+  },
+  "id": "f18STPhkVJ2qtksr0Wrch",
+  "tags": []
+}
