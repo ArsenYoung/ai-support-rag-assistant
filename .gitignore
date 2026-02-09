@@ -1,7 +1,5 @@
 *
 !.gitignore
-!arch.md
-!plan.md
 !.github/
 !.github/**
 !tests/

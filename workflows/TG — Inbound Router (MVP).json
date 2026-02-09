@@ -85,58 +85,24 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        832,
-        816
+        1136,
+        960
       ],
       "id": "f2c9d18f-7043-475a-bae7-d16be81e05d3",
       "name": "Call 'KB — Answer v1'"
     },
     {
       "parameters": {
-        "jsCode": "return items.map(item => {\n  const j = item.json || {};\n\n  const helpText =\n`Hi! I'm your Knowledge Base Assistant.\n\nI answer strictly based on the knowledge base.\nIf there isn't enough context, I'll ask for clarification or say I don't know.\n\nCommands:\n/sources - list available KB documents\n/debug - show routing details (top_score, mode, top sources)\n/help - show this message\n\nAsk your question in plain text.`;\n\n  return {\n    json: {\n      ...j,\n\n      // ❗ retrieval НЕ трогаем для команд\n      retrieval: j.retrieval ?? null,\n\n      error: j.error ?? null,\n\n      decision: {\n        ...(j.decision || {}),\n        mode: \"COMMAND\",\n        reason: \"help\"\n      },\n\n      output: {\n        ...(j.output || {}),\n        answer: helpText,\n        sources: []\n      }\n    }\n  };\n});"
+        "jsCode": "return items.map(item => {\n  const j = item.json || {};\n\n  const helpHtml =\n`<b>KB RAG Assistant (demo)</b>\n\n<b>What you get</b>\n• <b>Digest</b> of the latest captured posts + <b>source links</b>\n• <b>Q&amp;A</b> that answers <b>only from those sources</b> (no guessing)\n• Top signals are marked: 🚨 / ⚠️ / 💤\n\n<b>How to use</b>\n1) <code>/start &lt;invite_token&gt;</code> — enable demo\n2) <code>/digest</code> — show digest\n\n<b>Invite token / questions</b>\nFor an invite token or any questions about this bot, message <b>@arseniy_ostroumov</b>.\n\n<b>Then ask a question</b>, for example:\n• What are the key updates on <code>$Whalentine</code>?\n• Summarize the claim about altcoins breaking the downtrend vs <code>BTC</code>.\n• What does “survival is the alpha” mean here?\n\n<b>Note</b>\nIf the answer isn’t in the sources, I’ll say <b>I can’t answer from the KB</b>.`;\n\n  return {\n    json: {\n      ...j,\n\n      // ❗ retrieval НЕ трогаем для команд\n      retrieval: j.retrieval ?? null,\n      error: j.error ?? null,\n\n      decision: {\n        ...(j.decision || {}),\n        mode: \"COMMAND\",\n        reason: \"help\"\n      },\n\n      output: {\n        ...(j.output || {}),\n        answer: helpHtml,\n        sources: [],\n        parse_mode: \"HTML\"\n      }\n    }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
-        -240
+        128,
+        272
       ],
       "id": "e4ee867e-d801-4e15-bd11-f89efaeac16d",
       "name": "Cmd — Help (Build Reply)"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "select\n  regexp_replace(trim(lower(kb_ref)), '[-\\s]+', '_', 'g') as source,\n  count(*) as chunks\nfrom public.kb_chunks\ngroup by 1\norder by chunks desc\nlimit 30;",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        512,
-        304
-      ],
-      "id": "30a243a9-6929-4793-8ef1-bbc309b6af6c",
-      "name": "DB — List sources",
-      "credentials": {
-        "postgres": {
-          "id": "qs9FA0xQaKSneWtC",
-          "name": "RAG Assistant DB"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Cmd — Sources (Build Reply)\n\n// 1) База — текущий инпут (он уже содержит meta/chat_id и т.д.)\nconst base = $json ?? {};\n\n// 2) Rows из БД: если нода стоит после SQL, то items = строки.\n// Но если перед ней был Merge, иногда rows лежат в другом поле.\n// Делаем максимально безопасно:\nconst rows = (Array.isArray(items) ? items : [])\n  .map(i => i?.json)\n  .filter(Boolean);\n\n// 3) Формируем список\nconst list = rows.slice(0, 30).map((r, idx) => {\n  const name =\n    r.source ??\n    r.kb_ref ??\n    r.doc ??\n    r.source_url ??\n    'unknown';\n\n  const chunks = r.chunks ?? r.chunk_ids ?? r.chunk_count ?? '';\n  const suffix = chunks ? ` (${chunks})` : '';\n  return `${idx + 1}) ${name}${suffix}`;\n});\n\n// 4) Текст ответа\nconst reply_text =\n  list.length\n    ? `Sources:\\n${list.join('\\n')}`\n    : 'No sources yet.';\n\n// 5) ВАЖНО: n8n ждёт { json: ... }\nreturn [{\n  json: {\n    ...base,\n    output: {\n      ...(base.output ?? {}),\n      reply_text,\n    },\n    chat_id:\n      base.chat_id ??\n      base.meta?.chat_id ??\n      base.telegram?.message?.chat?.id ??\n      null,\n  }\n}];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1088,
-        304
-      ],
-      "id": "78eb6535-2844-47e9-92ae-d442fe2fd1b0",
-      "name": "Cmd — Sources (Build Reply)"
     },
     {
       "parameters": {
@@ -183,57 +149,16 @@
     },
     {
       "parameters": {
-        "jsCode": "// n8n Code node: Build reply for /debug (last turn)\n\nconst r = $json || {};\n\n// ts может называться created_at (timestamptz)\nconst t = r.created_at ?? r.ts ?? \"-\";\nconst trace = r.trace_id ?? \"-\";\n\nconst q = r.question ?? \"-\";\nconst a = r.answer ?? \"-\";\n\nconst fallbackType = r.fallback_type ?? \"-\";\nconst topScore = r.top_score ?? '-';\nconst latencyMs = r.latency_ms ?? '-';\nconst promptVersion = r.prompt_version ?? '-';\nconst model = r.model ?? '-';\n\n// (опционально) sources_json красиво показать\nlet sourcesLine = \"\";\ntry {\n  const sj = r.sources_json;\n  if (sj && typeof sj === \"object\") {\n    // пример: если у тебя там hits или sources — подстрой под свой формат\n    // сейчас просто покажем kb_ref если он там есть\n    const kbRef =\n      sj?.kb_ref ??\n      sj?.retrieval?.kb_ref ??\n      sj?.decision?.kb_ref ??\n      null;\n    if (kbRef) sourcesLine = `\\nkb_ref: ${kbRef}`;\n  }\n} catch {}\n\nconst reply =\n`DEBUG (last turn)\n\nt: ${t}\ntrace: ${trace}\n\nq: ${q}\n\na: ${a}\n\nfallback_type: ${fallbackType}\ntop_score: ${topScore}\nlatency_ms: ${latencyMs}\nprompt_version: ${promptVersion}\nmodel: ${model}${sourcesLine}`;\n\nreturn [{\n  json: {\n    ...r,\n    output: {\n      ...(r.output ?? {}),\n      reply_text: reply,\n    },\n  },\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1056,
-        544
-      ],
-      "id": "9dbac388-8c02-4921-a994-018ce897901a",
-      "name": "Build Debug Reply"
-    },
-    {
-      "parameters": {
         "jsCode": "const j = $json ?? {};\nconst chat_id = Number(j.telegram?.message?.chat?.id ?? j.meta?.chat_id ?? j.chat_id ?? 0);\n\n// только твой приватный чат для демо (замени/добавь нужные id)\nconst DEMO_CHAT_IDS = new Set([168487641]);\n\nconst forced = DEMO_CHAT_IDS.has(chat_id) ? \"ceo_x_demo\" : null;\nconst kb_ref = forced ?? (j.kb_ref ?? j.meta?.kb_ref ?? null);\n\nreturn [{\n  json: {\n    ...j,\n    kb_ref,\n    meta: {\n      ...(j.meta ?? {}),\n      kb_ref,\n      chat_id: Number.isFinite(chat_id) ? chat_id : (j.meta?.chat_id ?? null),\n    },\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        624,
-        816
+        928,
+        960
       ],
       "id": "fb65251b-d22d-4862-9985-f91c0a77cce1",
       "name": "Force kb_ref for demo chat"
-    },
-    {
-      "parameters": {
-        "jsCode": "return [{ json: $json }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        512,
-        528
-      ],
-      "id": "0af01d46-216c-48eb-9377-f74e332ec8b3",
-      "name": "Pass-through"
-    },
-    {
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "combineByPosition",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        896,
-        544
-      ],
-      "id": "9552f066-8d6d-4b19-9b60-4c241fdad3f2",
-      "name": "Merge"
     },
     {
       "parameters": {
@@ -321,9 +246,9 @@
                 },
                 "conditions": [
                   {
-                    "id": "985a0084-5c42-4a51-b3bf-1a0208dd768b",
+                    "id": "5e891109-e5d1-4f4a-932a-9b6e84c6ee4d",
                     "leftValue": "={{$json.input.question}}",
-                    "rightValue": "^\\/sources($|\\s|@)",
+                    "rightValue": "^\\/digest($|\\s|@)",
                     "operator": {
                       "type": "string",
                       "operation": "regex"
@@ -333,31 +258,7 @@
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "/sources"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "16b8cd8b-a553-487b-906e-106c8ba31816",
-                    "leftValue": "={{$json.input.question}}",
-                    "rightValue": "^\\/debug($|\\s|@)",
-                    "operator": {
-                      "type": "string",
-                      "operation": "regex"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "/debug"
+              "outputKey": "/digest"
             },
             {
               "conditions": {
@@ -419,8 +320,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        48,
-        -1072
+        112,
+        -208
       ],
       "id": "4b2dac74-f819-4abc-97c0-11a70caf8072",
       "name": "Call 'KB — Start Redeem'"
@@ -450,8 +351,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        80,
-        -880
+        128,
+        16
       ],
       "id": "7cd1d56e-8015-447f-b2e2-d70d0963dda6",
       "name": "Call 'SUB WF Invite Create'"
@@ -484,8 +385,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        384,
-        832
+        688,
+        976
       ],
       "id": "4c1285fa-0071-4458-8de5-75cea7ed4f87",
       "name": "IF “allowed?”"
@@ -501,8 +402,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        0,
-        848
+        304,
+        992
       ],
       "id": "a9567d38-4151-4f6d-8430-594dbb555cf5",
       "name": "Load whitelist",
@@ -525,8 +426,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        592,
-        1008
+        896,
+        1152
       ],
       "id": "becd395e-0256-4de0-b7d9-bb26b7bbe385",
       "name": "🔒 Access by invite only",
@@ -547,8 +448,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        192,
-        832
+        496,
+        976
       ],
       "id": "5431a734-c2cc-454e-b615-3e6098832cb4",
       "name": "Merge1"
@@ -581,11 +482,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        336,
-        544
+        464,
+        448
       ],
-      "id": "ddfee2b0-c8a1-4377-a2f5-c56e0496f122",
-      "name": "IF “allowed?”1"
+      "id": "fa17297f-1374-4570-af53-1fadd3adb9f7",
+      "name": "IF “allowed?”3"
     },
     {
       "parameters": {
@@ -598,11 +499,11 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -48,
-        560
+        80,
+        464
       ],
-      "id": "1be1f2d3-8828-4b23-8dba-ea325315bf03",
-      "name": "Load whitelist1",
+      "id": "7b817c5d-7daa-4b10-bc5f-0b8d8a4525b1",
+      "name": "Load whitelist3",
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
@@ -620,192 +521,98 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        144,
+        272,
+        448
+      ],
+      "id": "0d3398ce-5915-4e27-bd5d-3e3b6dc23e88",
+      "name": "Merge5"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        528
+      ],
+      "id": "09da4e93-ab54-407c-90d5-160c253eff00",
+      "name": "Pass-through1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1136,
         544
       ],
-      "id": "c7c9bf28-ebc3-4ba5-bbaa-d508d7e57273",
-      "name": "Merge2"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "4533aabd-4928-4483-bdc3-236692416c7b",
-              "leftValue": "={{ !!$json.chat_id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        288,
-        256
-      ],
-      "id": "4e56a3d6-5eb7-4e64-88b0-a5c3cf9f6b67",
-      "name": "IF “allowed?”2"
+      "id": "f1536f06-d3e3-4497-a2c3-6579067dc5e3",
+      "name": "Merge6"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "select\n  chat_id,\n  role,\n  expires_at,\n  is_active\nfrom public.allowed_chats\nwhere chat_id = $1\n  and is_active = true\n  and (expires_at is null or expires_at > now())\nlimit 1;",
-        "options": {
-          "queryReplacement": "={{$json.meta.chat_id}}"
-        }
+        "query": "select\n  doc,\n  section,\n  source_url,\n  content,\n  created_at\nfrom public.kb_chunks\nwhere kb_ref = 'ceo_x_demo'\norder by created_at desc\nlimit 12;",
+        "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -48,
-        336
-      ],
-      "id": "76c41726-15a2-4999-90e5-8287591b4b21",
-      "name": "Load whitelist2",
-      "alwaysOutputData": true,
-      "credentials": {
-        "postgres": {
-          "id": "qs9FA0xQaKSneWtC",
-          "name": "RAG Assistant DB"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "combineByPosition",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        96,
-        240
-      ],
-      "id": "655c5599-0047-4c42-a894-d2a6f3926ec0",
-      "name": "Merge3"
-    },
-    {
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "combineByPosition",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        736,
-        256
-      ],
-      "id": "026af82c-7a5b-4148-a882-cbf45104c15f",
-      "name": "Merge4"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "select\n  created_at, trace_id, question, answer,\n  fallback_type, top_score, latency_ms, prompt_version, model,\n  sources_json\nfrom public.chat_turns\nwhere user_id = $1\n  and question is not null\n  and question not in ('/debug','/sources','/help','/start','/invite','/digest','/demo')\norder by created_at desc\nlimit 1;",
-        "options": {
-          "queryReplacement": "={{$json.input.user_id ?? $json.meta.chat_id}}"
-        }
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        704,
+        944,
         624
       ],
-      "id": "cfcd4888-de8e-46fe-810c-492edd054be9",
-      "name": "PG — Debug last turns",
+      "id": "ab1fd397-1414-447e-8ad8-0b3df1ead8c7",
+      "name": "Postgres (Supabase) node — SQL",
       "credentials": {
         "postgres": {
           "id": "qs9FA0xQaKSneWtC",
           "name": "RAG Assistant DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Digest builder (Telegram HTML) — FINAL\n// Applies requested changes:\n// 1) Hide section like tweet_08/tweet_09 completely (no section shown)\n// 2) Different numbering: Top #1..#3, Feed #1..\n// 3) Skip \"Other\" block if content empty/too short\n// 4) Ticker label: if tickers>3 => [MULTI], else show up to 2 tickers [$BTC,$ETH], else none\n// 5) Stricter 🚨: only if text contains \"🚨\" OR keywords broke/break/downtrend/capitulation\n//    else ⚠️ if \"watch\" keywords, else 💤\n// 6) Short TL;DR: Coverage top-2 + +N, Tickers top-4\n// Plus: unified link style, separators, selective bold.\n\nconst rows = (items ?? []).map(i => i?.json).filter(Boolean);\n\nconst chat_id =\n  $json?.chat_id ??\n  $json?.meta?.chat_id ??\n  $json?.telegram?.message?.chat?.id ??\n  null;\n\nfunction escHtml(s) {\n  if (s === null || s === undefined) return \"\";\n  return String(s)\n    .replace(/&/g, \"&amp;\")\n    .replace(/</g, \"&lt;\")\n    .replace(/>/g, \"&gt;\")\n    .replace(/\"/g, \"&quot;\");\n}\n\nfunction normDoc(doc) {\n  const d = (doc ?? \"\").toString().trim();\n  if (!d || d.toLowerCase() === \"unknown\") return \"Other\";\n  return d;\n}\n\nfunction snip(s, n = 160) {\n  if (s === null || s === undefined) return \"\";\n  const t = String(s).replace(/\\s+/g, \" \").trim();\n  return t.length > n ? t.slice(0, n - 1) + \"…\" : t;\n}\n\nfunction parseDateMs(v) {\n  if (!v) return null;\n  const ms = Date.parse(String(v));\n  return Number.isFinite(ms) ? ms : null;\n}\n\nfunction fmtUTC(ms) {\n  const d = new Date(ms);\n  const hh = String(d.getUTCHours()).padStart(2, \"0\");\n  const mm = String(d.getUTCMinutes()).padStart(2, \"0\");\n  return `${hh}:${mm} UTC`;\n}\n\nfunction extractTickers(text) {\n  if (!text) return [];\n  const m = String(text).match(/\\$[A-Za-z0-9_]{2,12}/g);\n  if (!m) return [];\n  const seen = new Set();\n  const out = [];\n  for (const t of m) {\n    const k = t.toUpperCase();\n    if (!seen.has(k)) { seen.add(k); out.push(k); }\n  }\n  return out;\n}\n\nfunction tickerBadge(text) {\n  const ts = extractTickers(text);\n  if (!ts.length) return \"\"; // no badge\n  if (ts.length > 3) return \"MULTI\";\n  const shown = ts.slice(0, 2);\n  return shown.join(\",\");\n}\n\n// Stricter importance heuristic (no LLM)\nfunction signalTag(text) {\n  const t = (text ?? \"\").toString().toLowerCase();\n\n  // 🚨 only if explicit siren or strong keywords\n  const hi = [\"🚨\", \"broke\", \"break\", \"downtrend\", \"capitulation\"];\n  if (hi.some(k => t.includes(k))) return \"🚨\";\n\n  // ⚠️ watchlist-ish\n  const mid = [\"unpopular\", \"opinion\", \"i think\", \"isn't done\", \"maybe\", \"study this\", \"watch\", \"seems\", \"looks\"];\n  if (mid.some(k => t.includes(k))) return \"⚠️\";\n\n  return \"💤\";\n}\n\nfunction weight(tag) {\n  return tag === \"🚨\" ? 2 : tag === \"⚠️\" ? 1 : 0;\n}\n\nfunction keyFor(e) {\n  // for dedupe: prefer url, else doc+section\n  if (e.url) return `url:${e.url}`;\n  return `ds:${e.doc}::${e.section}`;\n}\n\nconst SEP = \"────────────\";\n\nif (!rows.length) {\n  return [{\n    json: {\n      chat_id,\n      parse_mode: \"HTML\",\n      reply_text:\n        `🧾 <b>Digest</b>\\n${SEP}\\n` +\n        `No chunks yet. Send <code>/demo</code> to load demo feed.`,\n    }\n  }];\n}\n\n// Enrich\nconst enriched = rows.map(r => {\n  const doc = normDoc(r?.doc);\n  const section = (r?.section ?? \"chunk\").toString();\n  const url = r?.source_url ? String(r.source_url) : \"\";\n  const content = r?.content ?? \"\";\n  const tag = signalTag(content);\n  const created_ms = parseDateMs(r?.created_at);\n  const badge = tickerBadge(content); // \"MULTI\" or \"$BTC,$ETH\" or \"\"\n  return { r, doc, section, url, content, tag, created_ms, badge, k: null };\n});\n\n// Recency\nconst maxMs = enriched.reduce((acc, x) => {\n  if (x.created_ms === null) return acc;\n  return acc === null ? x.created_ms : Math.max(acc, x.created_ms);\n}, null);\n\n// Coverage by doc\nconst cov = new Map();\nfor (const e of enriched) cov.set(e.doc, (cov.get(e.doc) ?? 0) + 1);\nconst covPairs = Array.from(cov.entries()).sort((a, b) => b[1] - a[1]);\nconst covTop2 = covPairs.slice(0, 2).map(([d, n]) => `${d}=${n}`);\nconst covMore = Math.max(0, covPairs.length - 2);\n\n// Top tickers (for TL;DR): top-4\nconst allTickers = [];\nfor (const e of enriched) allTickers.push(...extractTickers(e.content));\nconst topTickers = (() => {\n  const c = new Map();\n  for (const t of allTickers) c.set(t, (c.get(t) ?? 0) + 1);\n  return Array.from(c.entries())\n    .sort((a, b) => b[1] - a[1])\n    .slice(0, 4)\n    .map(([t, n]) => `${t}(${n})`);\n})();\n\n// Signals counts\nlet cHi = 0, cMid = 0, cLow = 0;\nfor (const e of enriched) {\n  if (e.tag === \"🚨\") cHi++;\n  else if (e.tag === \"⚠️\") cMid++;\n  else cLow++;\n}\n\n// Top signals: best by weight then newest\nconst topSignals = enriched\n  .slice()\n  .sort((a, b) => (weight(b.tag) - weight(a.tag)) || ((b.created_ms ?? -1) - (a.created_ms ?? -1)))\n  .slice(0, 3);\n\nconst topKeys = new Set(topSignals.map(e => keyFor(e)));\n\n// Group by doc\nconst byDoc = new Map();\nfor (const e of enriched) {\n  if (!byDoc.has(e.doc)) byDoc.set(e.doc, []);\n  byDoc.get(e.doc).push(e);\n}\n\n// Doc order: Other last\nconst docsOrdered = Array.from(byDoc.keys()).sort((a, b) => {\n  if (a === \"Other\") return 1;\n  if (b === \"Other\") return -1;\n  return (byDoc.get(b)?.length ?? 0) - (byDoc.get(a)?.length ?? 0);\n});\n\n// Sort within doc: importance desc, then newest desc\nfor (const doc of docsOrdered) {\n  byDoc.get(doc).sort((a, b) => {\n    const dw = weight(b.tag) - weight(a.tag);\n    if (dw) return dw;\n    return (b.created_ms ?? -1) - (a.created_ms ?? -1);\n  });\n}\n\n// Helper: render badge\nfunction renderBadge(badge) {\n  if (!badge) return \"\";\n  if (badge === \"MULTI\") return ` <b>[</b><code>MULTI</code><b>]</b>`;\n  return ` <b>[</b><code>${escHtml(badge)}</code><b>]</b>`;\n}\n\n// Build output\nlet out =\n  `🧾 <b>Digest</b> <i>(last ${enriched.length} chunks)</i>\\n` +\n  `${SEP}\\n`;\n\nout += `<b>Signals:</b> 🚨 ${cHi} · ⚠️ ${cMid} · 💤 ${cLow}`;\nif (maxMs !== null) out += ` · <b>last:</b> <code>${escHtml(fmtUTC(maxMs))}</code>`;\nout += `\\n`;\n\nif (covTop2.length) {\n  out += `<b>Coverage:</b> <code>${escHtml(covTop2.join(\"  \"))}${covMore ? `  +${covMore}` : \"\"}</code>\\n`;\n}\nif (topTickers.length) {\n  out += `<b>Tickers:</b> <code>${escHtml(topTickers.join(\"  \"))}</code>\\n`;\n}\n\nout += `${SEP}\\n🔥 <b>Top signals</b>\\n`;\n\n// Render Top signals (short snippet, no section shown)\nlet tIdx = 1;\nfor (const e of topSignals) {\n  const badge = renderBadge(e.badge);\n  const head = `${e.tag} <b>Top #${tIdx}</b>${badge} <i>${escHtml(e.doc)}</i>`;\n  out += `\\n${head}\\n${escHtml(snip(e.content, 110))}`;\n  if (e.url) out += `\\n<a href=\"${escHtml(e.url)}\">🔗 ${escHtml(e.doc)}</a>`;\n  out += `\\n`;\n  tIdx++;\n}\n\nout += `\\n${SEP}\\n`;\n\n// Full digest (skip duplicates, hide Other if empty/too short)\nlet fIdx = 1;\nconst LIMIT = 12;\n\nfor (const doc of docsOrdered) {\n  const arr = byDoc.get(doc) ?? [];\n\n  // skip top duplicates\n  const visible = arr.filter(e => !topKeys.has(keyFor(e)));\n\n  // Special handling: Other — hide if content empty/short\n  let filtered = visible;\n  if (doc === \"Other\") {\n    filtered = visible.filter(e => snip(e.content, 40).length >= 20); // drop empty-ish\n    if (!filtered.length) continue;\n  } else {\n    if (!filtered.length) continue;\n  }\n\n  out += `<b>${escHtml(doc)}</b> <i>(${filtered.length})</i>\\n`;\n\n  for (const e of filtered) {\n    const badge = renderBadge(e.badge);\n\n    out += `\\n${e.tag} <b>Feed #${fIdx}</b>${badge}\\n${escHtml(snip(e.content, 170))}`;\n    if (e.url) out += `\\n<a href=\"${escHtml(e.url)}\">🔗 ${escHtml(doc)}</a>`;\n    out += `\\n`;\n\n    fIdx++;\n    if (fIdx > LIMIT) break;\n  }\n\n  out += `\\n`;\n  if (fIdx > LIMIT) break;\n}\n\nreturn [{\n  json: {\n    chat_id,\n    parse_mode: \"HTML\",\n    reply_text: out,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        544
+      ],
+      "id": "b2a6bfb4-ec64-4708-be91-0e30eaf15b7c",
+      "name": "Build digest text"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id || $json.meta.chat_id }}",
+        "text": "={{ $json.reply_text || $json.output.answer }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1520,
+        368
+      ],
+      "id": "96d688a3-6364-43a4-a741-c5d3ee3fbf87",
+      "name": "TG — Send Reply1",
+      "webhookId": "4470afdf-cbdd-4831-9467-6f55459e53a9",
+      "alwaysOutputData": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "0OsuU6wfbas4R3nh",
+          "name": "RAGAssistantBot"
         }
       }
     }
   ],
-  "pinData": {
-    "Cmd — Help (Build Reply)": [
-      {
-        "json": {
-          "meta": {
-            "request_id": "e200a1a3-c262-433d-927a-21bde7a1ada2",
-            "ts": "2025-12-18T17:57:44.841Z",
-            "channel": "telegram",
-            "prompt_version": "v1",
-            "chat_model": "day1_stub",
-            "embedding_model": "n/a",
-            "chat_id": 168487641
-          },
-          "input": {
-            "user_id": "168487641",
-            "question": "/help"
-          },
-          "telegram": {
-            "update_id": 15493821,
-            "message": {
-              "message_id": 164,
-              "from": {
-                "id": 168487641,
-                "is_bot": false,
-                "first_name": "Arseniy",
-                "last_name": "Ostroumov",
-                "username": "arseniy_ostroumov",
-                "language_code": "en"
-              },
-              "chat": {
-                "id": 168487641,
-                "first_name": "Arseniy",
-                "last_name": "Ostroumov",
-                "username": "arseniy_ostroumov",
-                "type": "private"
-              },
-              "date": 1766080665,
-              "text": "/help",
-              "entities": [
-                {
-                  "offset": 0,
-                  "length": 5,
-                  "type": "bot_command"
-                }
-              ]
-            }
-          },
-          "retrieval": {
-            "top_k": 5,
-            "hits": [],
-            "top_score": null
-          },
-          "decision": {
-            "mode": "COMMAND",
-            "reason": "help"
-          },
-          "output": {
-            "answer": "Hi! I'm your Knowledge Base Assistant.\n\nI answer strictly based on the knowledge base.\nIf there isn't enough context, I'll ask for clarification or say I don't know.\n\nCommands:\n/sources - list available KB documents\n/debug - show routing details (top_score, mode, top sources)\n/help - show this message\n\nAsk your question in plain text.",
-            "sources": []
-          },
-          "error": null,
-          "timers": {
-            "t_start_ms": 1766080664841
-          }
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "TG — Inbound (Trigger)": {
       "main": [
@@ -844,29 +651,7 @@
       "main": [
         [
           {
-            "node": "Envelope — Ensure v1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "DB — List sources": {
-      "main": [
-        [
-          {
-            "node": "Merge4",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Cmd — Sources (Build Reply)": {
-      "main": [
-        [
-          {
-            "node": "Envelope — Ensure v1",
+            "node": "TG — Send Reply1",
             "type": "main",
             "index": 0
           }
@@ -889,49 +674,11 @@
         ]
       ]
     },
-    "Build Debug Reply": {
-      "main": [
-        [
-          {
-            "node": "Envelope — Ensure v1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Force kb_ref for demo chat": {
       "main": [
         [
           {
             "node": "Call 'KB — Answer v1'",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Pass-through": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "PG — Debug last turns",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge": {
-      "main": [
-        [
-          {
-            "node": "Build Debug Reply",
             "type": "main",
             "index": 0
           }
@@ -963,24 +710,12 @@
         ],
         [
           {
-            "node": "Load whitelist2",
+            "node": "Load whitelist3",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Merge3",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Load whitelist1",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Merge2",
+            "node": "Merge5",
             "type": "main",
             "index": 0
           }
@@ -1061,33 +796,33 @@
         ]
       ]
     },
-    "Load whitelist1": {
+    "Load whitelist3": {
       "main": [
         [
           {
-            "node": "Merge2",
+            "node": "Merge5",
             "type": "main",
             "index": 1
           }
         ]
       ]
     },
-    "Merge2": {
+    "Merge5": {
       "main": [
         [
           {
-            "node": "IF “allowed?”1",
+            "node": "IF “allowed?”3",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF “allowed?”1": {
+    "IF “allowed?”3": {
       "main": [
         [
           {
-            "node": "Pass-through",
+            "node": "Pass-through1",
             "type": "main",
             "index": 0
           }
@@ -1101,69 +836,51 @@
         ]
       ]
     },
-    "Load whitelist2": {
+    "Pass-through1": {
       "main": [
         [
           {
-            "node": "Merge3",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge3": {
-      "main": [
-        [
-          {
-            "node": "IF “allowed?”2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF “allowed?”2": {
-      "main": [
-        [
-          {
-            "node": "DB — List sources",
+            "node": "Merge6",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Merge4",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "🔒 Access by invite only",
+            "node": "Postgres (Supabase) node — SQL",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Merge4": {
+    "Postgres (Supabase) node — SQL": {
       "main": [
         [
           {
-            "node": "Cmd — Sources (Build Reply)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "PG — Debug last turns": {
-      "main": [
-        [
-          {
-            "node": "Merge",
+            "node": "Merge6",
             "type": "main",
             "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge6": {
+      "main": [
+        [
+          {
+            "node": "Build digest text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build digest text": {
+      "main": [
+        [
+          {
+            "node": "TG — Send Reply1",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -1175,7 +892,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "9725a634-414a-405f-b9ea-a03a7cbb8656",
+  "versionId": "7b502017-be76-4963-b20b-2919ed89a233",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "c6d12de685a5982c0909d3ed1470b369648fca6c63e6a68b69f7297e29a8de4d"

@@ -1,43 +1,76 @@
-# AI Support Knowledge Base Assistant (RAG)
+# KB RAG Assistant (Demo)
+Telegram bot that summarizes a curated feed and answers strictly from sources with gating (`ALLOW` / `CLARIFY` / `NO_ANSWER`).
 
-An AI support assistant that **answers only from your verified knowledge base**, ships with **citations by default**, and refuses to hallucinate (`ALLOW / CLARIFY / NO_ANSWER`). Built for teams that need trustworthy, auditable replies fast.
+## What This Demo Shows
+- Ingest → chunks in Supabase (pgvector)
+- Retrieval + strict “answer only from KB”
+- Digest with signals + recency + links
+- Deterministic behavior: no hallucinations, if missing → can’t answer
+- Basic safety/access: invite token + whitelist session
 
-## Why teams buy this
-- **Trust first:** Every answer cites KB chunks; unknowns fall back to safe clarifications.
-- **Production-safe:** Confidence gate, timeouts, retries, and structured fallbacks already wired.
-- **Auditable:** Each turn is logged with scores, latency, and sources for instant RCA.
-- **Fast rollout:** Two webhooks (ingest + answer), Telegram front-end, and ready scripts to prove value in minutes.
+## Live Demo In 30 Seconds
+1. Get an invite token (contact `@arsenii_ostroumov`).
+2. Send `/start <token>`.
+3. Send `/digest`.
+4. Ask: “What are the key updates on $Whalentine?”
+5. See: reply + sources.
 
-## What’s inside (lean)
-- RAG pipeline: ingest → chunk → embed → vector search → gate → KB-only LLM → citations.
-- Confidence guardrails: `ALLOW` / `CLARIFY` / `NO_ANSWER` to prevent hallucinations.
-- Telemetry: `top_score`, latency, sources logged for every chat turn.
+![Demo screenshot](screenshots/Screenshot%20from%202025-12-19%2013-30-03.png)
 
-## n8n workflows (ready to import)
-- `KB — Ingest v1 (Webhook)` — docs → chunks → embeddings → `kb_chunks`
-- `KB — Answer v1` — retrieval + gate + LLM + citations
-- `TG — Inbound Router (MVP)` — Telegram entrypoint and commands (`/help`, `/sources`, `/debug`)
-- `Ops — Log chat_turn` — durable logging to Postgres/Supabase
+## Key Features
+- `/digest`: TL;DR (signals, coverage, tickers, recency), top signals, links
+- Gating: `ALLOW` / `CLARIFY` / `NO_ANSWER`
+- Citations: 1–5 sources for `ALLOW`, none otherwise
+- Dedup: digest de-duplicates by canonical URL when present (fallback: doc + section)
+- Observability: `trace_id`, `top_score`, `latency_ms`, sources logged in Supabase
 
-## Webhook contracts
-- **Ingest** (`kb/ingest`): `kb_ref`, `doc`, `section`, `text`, optional `source_url`, `tags[]`, `doc_id`, `replace`.
-- **Answer** (`kb/answer`): `kb_ref`, `question`, optional `retrieval.top_k` (default 5).
-
-## Prove it fast (local smoke)
-```bash
-export N8N_INGEST_URL="https://…/webhook/…/kb/ingest"
-export N8N_ANSWER_URL="https://…/webhook/…/kb/answer"
-
-bash tests/smoke_ingest.sh
-bash tests/smoke_answer.sh
+## Architecture
+```mermaid
+flowchart LR
+  TG[Telegram] --> R[n8n router]
+  R -->|/digest| D[Digest builder]
+  R -->|Q&A| RET[Retrieve KB]
+  RET --> LLM[LLM classify]
+  LLM --> RESP[Build response]
+  D --> TG
+  RESP --> TG
+  D --> DB[(Supabase)]
+  RET --> DB
+  subgraph Supabase
+    KB[kb_chunks]
+    CT[chat_turns]
+    INV[demo_invites]
+    ALW[allowed_chats]
+  end
 ```
 
-## Tech
-n8n · OpenAI · Postgres/pgvector (Supabase) · Telegram Bot API
+## Data Model (Important Fields)
+- `kb_chunks`: `kb_ref`, `doc`, `section`, `content`, `source_url`, `created_at`
+- `chat_turns`: `trace_id`, `chat_id`, `question`, `answer`, `fallback_type`, `top_score`, `latency_ms`, `sources_json`
+- `demo_invites`: `token`, `expires_at`, `consumed_at`, `chat_id`, `user_id`
+- `allowed_chats`: `chat_id`, `user_id`, `role`, `expires_at`, `is_active`, `last_seen_at`
 
-## Screenshots
-<img width="1843" height="841" alt="Screenshot from 2025-12-19 13-30-03" src="https://github.com/user-attachments/assets/a7d9d6c9-0cd2-4f04-8382-52a7fc252be8" />
-<img width="1842" height="435" alt="Screenshot from 2025-12-19 13-30-42" src="https://github.com/user-attachments/assets/503afc03-6556-4452-bebd-3f8a17f8fb8e" />
-<img width="1843" height="366" alt="Screenshot from 2025-12-19 13-31-06" src="https://github.com/user-attachments/assets/74c1034f-e6f1-4124-b1c8-dd288b972ca6" />
-<img width="1848" height="494" alt="Screenshot from 2025-12-19 13-31-24" src="https://github.com/user-attachments/assets/d68cd2cd-4ce0-4a7e-9544-c95e6953cda2" />
+## Setup (Developer)
+- Requirements: n8n, Supabase (Postgres + pgvector), Telegram Bot token, OpenAI API key
+- n8n credentials: OpenAI, Postgres/Supabase, Telegram
+- n8n variables: `INGEST_WEBHOOK_SECRET`
+- Import workflows: `workflows/*.json`
+- Run: n8n locally (`n8n start`) or in n8n Cloud
 
+## Usage
+- `/start <invite_token>`
+- `/digest`
+- Plain questions (e.g., “What are the key updates on $Whalentine?”)
+
+## Safety / Limitations
+- No scraping from X in this demo
+- Answers only from loaded KB
+- Not financial advice
+- KB content is a curated sample
+
+## Roadmap
+- Digest pagination and filters
+- Better signal classifier
+- Multi-KB switching
+- Admin UI for uploads
+- Improved dedup + drift monitoring
